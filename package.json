@@ -19,6 +19,7 @@
     "test:correction:smoke": "tsx scripts/correction-smoke-test.ts",
     "verify:env": "tsx scripts/verify-env.ts",
     "reset:test-data": "tsx scripts/reset-test-data.ts",
+    "import:bootstrap": "tsx scripts/import-bootstrap-memory.ts",
     "mcp": "tsx src/mcp/server.ts"
   },
   "engines": {

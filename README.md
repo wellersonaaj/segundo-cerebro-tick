@@ -120,6 +120,36 @@ npm run dev
 
 API em `http://localhost:3000`.
 
+## Bootstrap do panorama inicial
+
+Importação manual do panorama curado via pipeline normal (`POST /inbox-items`). Não insere dados diretamente no banco.
+
+```bash
+cp data/bootstrap/memoria-inicial.example.md data/bootstrap/memoria-inicial.md
+# Editar manualmente data/bootstrap/memoria-inicial.md
+```
+
+Validar sem persistir (requer API **não** necessária no dry-run):
+
+```bash
+ALLOW_BOOTSTRAP_IMPORT=true npm run import:bootstrap -- data/bootstrap/memoria-inicial.md --dry-run
+```
+
+Importar (requer `npm run dev` ativo):
+
+```bash
+ALLOW_BOOTSTRAP_IMPORT=true npm run import:bootstrap -- data/bootstrap/memoria-inicial.md
+```
+
+Notas:
+
+- O panorama inicial deve ser **curado**; não importe histórico completo de e-mails ou mensagens nesta etapa.
+- O conteúdo passa pelo pipeline normal (extractor → Memory Resolver → persistência); o `raw_content` original é preservado integralmente.
+- Clarificações podem ser geradas após a importação.
+- Exige `ALLOW_BOOTSTRAP_IMPORT=true` como proteção contra importação acidental.
+- Limite padrão de 50.000 caracteres (`BOOTSTRAP_MAX_CHARS` sobrescrevível no `.env`).
+- O arquivo pessoal `data/bootstrap/memoria-inicial.md` **não deve ser commitado** (está no `.gitignore`); use `memoria-inicial.example.md` como template versionado.
+
 ### Exemplo: capturar nota
 
 ```bash

@@ -47,6 +47,14 @@ Termos genéricos (`fornecedor`, `cliente`, …) não geram entidade nem resolu�
 
 Se o Supabase já tiver schema da Fase 1A, aplique apenas objetos ausentes manualmente ou adapte migrations (não sobrescrever dados).
 
+## Busca textual (limitação conhecida)
+
+A busca textual atual usa ilike e pode exigir substring contígua. Exemplo: "integração Genius" pode não encontrar "integração da Genius". Melhoria futura: busca textual por tokens ou busca híbrida.
+
+## Bootstrap do panorama inicial
+
+Importação via `npm run import:bootstrap` limitada a `BOOTSTRAP_MAX_CHARS` (default 50.000). Sem chunking automático — dividir manualmente arquivos grandes antes de importar.
+
 ## Segurança mínima (revisão homologação)
 
 | Requisito | Status |
