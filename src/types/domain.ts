@@ -58,6 +58,8 @@ export interface InboxItem {
   active_extraction_run_id: string | null;
   latest_extraction_run_id: string | null;
   created_at: string;
+  source_reference?: string | null;
+  metadata?: Record<string, unknown> | null;
 }
 
 export interface ExtractionRun {

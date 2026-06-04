@@ -4,6 +4,7 @@ import type { ClarificationService } from '../services/clarification.service.js'
 
 const resolveSchema = z.object({
   answer: z.string().min(1),
+  apply: z.boolean().optional(),
 });
 
 export async function registerClarificationsRoutes(
@@ -27,7 +28,9 @@ export async function registerClarificationsRoutes(
       return reply.status(400).send({ error: 'Invalid input', details: parsed.error.flatten() });
     }
     try {
-      return await clarifications.resolve(id, parsed.data.answer);
+      return await clarifications.resolveAndApply(id, parsed.data.answer, {
+        apply: parsed.data.apply,
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (message.includes('not found')) return reply.status(404).send({ error: message });

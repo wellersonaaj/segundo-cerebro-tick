@@ -6,6 +6,7 @@ export interface TelegramConfig {
   webhookSecret: string;
   webhookUrl: string;
   defaultTimezone: string;
+  senderEntityReference: string | null;
 }
 
 export function isTelegramConfigured(): boolean {
@@ -30,6 +31,7 @@ export function getTelegramConfig(): TelegramConfig | null {
     webhookSecret: TELEGRAM_WEBHOOK_SECRET,
     webhookUrl: TELEGRAM_WEBHOOK_URL,
     defaultTimezone: env.TELEGRAM_DEFAULT_TIMEZONE,
+    senderEntityReference: env.TELEGRAM_SENDER_ENTITY_REFERENCE?.trim() ?? null,
   };
 }
 

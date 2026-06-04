@@ -1,19 +1,41 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { EntityLikeSourceMetadata } from '../types/ingestion-context.js';
+import type { SourceMode } from '../types/domain.js';
 import {
+  buildTrustedEntityReferencesFromMetadata,
   collectReferenceTextsFromExtractor,
   ReferenceResolverService,
   type MemoryResolverResult,
   type RegistryEntityFixture,
 } from './reference-resolver.service.js';
 import type { ExtractorOutputV14 } from '../openai/extractor-v1.4.types.js';
+import { applyFirstPersonPronounToResolverResult } from './first-person-pronoun-resolver.js';
+import { normalizeText } from '../utils/normalize.js';
 
 export class DbReferenceResolverService {
   constructor(private readonly db: SupabaseClient) {}
 
-  async resolveForExtractorOutput(output: ExtractorOutputV14): Promise<MemoryResolverResult> {
+  async resolveForExtractorOutput(
+    output: ExtractorOutputV14,
+    entityLike: EntityLikeSourceMetadata = {},
+    sourceMode: SourceMode = 'conversational',
+  ): Promise<MemoryResolverResult> {
     const registry = await this.loadRegistrySnapshot();
     const resolver = new ReferenceResolverService(registry);
-    return resolver.resolveReferences(collectReferenceTextsFromExtractor(output));
+    const refs = collectReferenceTextsFromExtractor(output);
+    const trusted = buildTrustedEntityReferencesFromMetadata(entityLike, resolver);
+    let result = resolver.resolveReferences(refs, trusted);
+
+    const senderRef = entityLike.sender_reference?.trim();
+    const senderResolved =
+      senderRef != null
+        ? (result.byReferenceText.get(senderRef) ??
+          result.byReferenceText.get(normalizeText(senderRef)) ??
+          null)
+        : null;
+
+    result = applyFirstPersonPronounToResolverResult(result, sourceMode, senderResolved);
+    return result;
   }
 
   private async loadRegistrySnapshot(): Promise<RegistryEntityFixture[]> {

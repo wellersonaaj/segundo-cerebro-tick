@@ -8,6 +8,7 @@ import type { ExtractorV14CompileResult } from '../src/services/extractor-v14-co
 import { ExtractorV14CompileService } from '../src/services/extractor-v14-compile.service.js';
 import { DbReferenceResolverService } from '../src/services/db-reference-resolver.service.js';
 import { CorrectionsRepository } from '../src/repositories/corrections.repository.js';
+import { ClarificationsRepository } from '../src/repositories/clarifications.repository.js';
 import type { InboxItem } from '../src/types/domain.js';
 import type { CompiledMemoryV2 } from '../src/types/memory-compiler-v2.js';
 import { createMockExtractV14, loadExtractorV14Fixture } from './helpers/mock-extractor-v14.js';
@@ -328,6 +329,7 @@ describe('ExtractionPipelineV14Service', () => {
     const output = loadExtractorV14Fixture();
     const extractV14 = vi.fn(createMockExtractV14(output));
     vi.spyOn(CorrectionsRepository.prototype, 'listByInboxItem').mockResolvedValue([]);
+    vi.spyOn(ClarificationsRepository.prototype, 'listAnsweredByInboxItem').mockResolvedValue([]);
     vi.spyOn(DbReferenceResolverService.prototype, 'resolveForExtractorOutput').mockResolvedValue({
       references: [],
       byReferenceText: new Map(),

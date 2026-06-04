@@ -7,7 +7,19 @@ import {
 export { SOURCE_BLOCK_RAW };
 
 const SOURCE_BLOCK_LINE_RE =
-  /^\[SOURCE_BLOCK:(raw|correction:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\]\s*$/i;
+  /^\[SOURCE_BLOCK:(raw|correction:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|clarification:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\]\s*$/i;
+
+function normalizeBlockId(match: string): string {
+  const lower = match.toLowerCase();
+  if (lower === 'raw') return SOURCE_BLOCK_RAW;
+  if (lower.startsWith('correction:')) {
+    return formatCorrectionSourceBlock(lower.slice('correction:'.length));
+  }
+  if (lower.startsWith('clarification:')) {
+    return formatClarificationSourceBlock(lower.slice('clarification:'.length));
+  }
+  return `[SOURCE_BLOCK:${lower}]`;
+}
 
 export interface SourceBlockSegment {
   block_id: string;
@@ -18,9 +30,20 @@ export function formatCorrectionSourceBlock(correctionId: string): string {
   return `[SOURCE_BLOCK:correction:${correctionId}]`;
 }
 
+export function formatClarificationSourceBlock(clarificationId: string): string {
+  return `[SOURCE_BLOCK:clarification:${clarificationId}]`;
+}
+
 export function buildEffectiveInputWithSourceBlocks(parts: {
   raw_content: string;
   corrections?: Array<{ id: string; correction_text: string }>;
+  clarifications?: Array<{
+    id: string;
+    question: string;
+    answer: string;
+    target_reference: string;
+    issue_type: string;
+  }>;
 }): string {
   const segments: string[] = [`${SOURCE_BLOCK_RAW}\n${parts.raw_content.trim()}`];
   for (const c of parts.corrections ?? []) {
@@ -28,6 +51,16 @@ export function buildEffectiveInputWithSourceBlocks(parts: {
     const body = c.correction_text.trim().startsWith('[CORREÇÃO]')
       ? c.correction_text.trim()
       : `[CORREÇÃO] ${c.correction_text.trim()}`;
+    segments.push(`${marker}\n${body}`);
+  }
+  for (const cl of parts.clarifications ?? []) {
+    const marker = formatClarificationSourceBlock(cl.id);
+    const body = [
+      '[CLARIFICAÇÃO]',
+      `P: ${cl.question}`,
+      `R: ${cl.answer}`,
+      `Alvo: ${cl.target_reference} (${cl.issue_type})`,
+    ].join('\n');
     segments.push(`${marker}\n${body}`);
   }
   return segments.join('\n\n');
@@ -53,15 +86,7 @@ export function parseSourceBlockSegments(effectiveInput: string): SourceBlockSeg
     const match = line.match(SOURCE_BLOCK_LINE_RE);
     if (match) {
       flush();
-      currentId = `[SOURCE_BLOCK:${match[1]!.toLowerCase()}]`.replace(
-        /correction:([0-9a-f-]+)/i,
-        (_, uuid) => `correction:${uuid.toLowerCase()}`,
-      );
-      if (match[1]!.toLowerCase() === 'raw') {
-        currentId = SOURCE_BLOCK_RAW;
-      } else {
-        currentId = formatCorrectionSourceBlock(match[1]!.slice('correction:'.length));
-      }
+      currentId = normalizeBlockId(match[1]!);
       continue;
     }
     if (currentId != null) {
@@ -77,11 +102,7 @@ export function listSourceBlockIds(effectiveInput: string): string[] {
   for (const line of effectiveInput.split('\n')) {
     const match = line.match(SOURCE_BLOCK_LINE_RE);
     if (!match) continue;
-    if (match[1]!.toLowerCase() === 'raw') {
-      ids.add(SOURCE_BLOCK_RAW);
-    } else {
-      ids.add(formatCorrectionSourceBlock(match[1]!.slice('correction:'.length)));
-    }
+    ids.add(normalizeBlockId(match[1]!));
   }
   return [...ids];
 }

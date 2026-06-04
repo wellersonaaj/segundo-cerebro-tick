@@ -91,6 +91,17 @@ export class ClarificationsRepository {
     return data as ClarificationRequest | null;
   }
 
+  async listAnsweredByInboxItem(inboxItemId: string): Promise<ClarificationRequest[]> {
+    const { data, error } = await this.db
+      .from('clarification_requests')
+      .select()
+      .eq('inbox_item_id', inboxItemId)
+      .eq('status', 'answered')
+      .order('answered_at', { ascending: true });
+    if (error) throw new Error(`clarifications.listAnsweredByInboxItem: ${error.message}`);
+    return (data ?? []) as ClarificationRequest[];
+  }
+
   async resolve(id: string, answer: string): Promise<ClarificationRequest> {
     const { data, error } = await this.db
       .from('clarification_requests')

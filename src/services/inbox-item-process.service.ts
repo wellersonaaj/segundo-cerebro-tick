@@ -34,6 +34,7 @@ export interface InboxItemProcessSuccess {
 /** Wired in Checkpoint B — v1.4-only extraction pipeline. */
 export interface InboxItemProcessPipeline {
   run(inboxItem: InboxItem): Promise<Omit<InboxItemProcessSuccess, 'ok'>>;
+  runReprocess(inboxItemId: string): Promise<Omit<InboxItemProcessSuccess, 'ok'>>;
 }
 
 export class InboxItemProcessService {
@@ -89,5 +90,20 @@ export class InboxItemProcessService {
       }
       throw err;
     }
+  }
+
+  async reprocessById(id: string): Promise<InboxItemProcessSuccess> {
+    if (!isValidUuid(id)) {
+      throw new InboxItemProcessError('INVALID_UUID', 'Invalid inbox item id');
+    }
+    if (!this.pipeline) {
+      throw new InboxItemProcessError('PIPELINE_NOT_WIRED', 'Extraction pipeline v1.4 is not wired');
+    }
+    const inboxItem = await this.inboxRepo.findById(id);
+    if (!inboxItem) {
+      throw new InboxItemProcessError('NOT_FOUND', 'Inbox item not found');
+    }
+    const result = await this.pipeline.runReprocess(id);
+    return { ok: true, ...result };
   }
 }

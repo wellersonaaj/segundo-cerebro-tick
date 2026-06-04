@@ -55,7 +55,14 @@ export async function buildApp(deps: AppDeps = {}) {
   const processor = new InboxProcessorService(db, extract);
   const corrections = new CorrectionService(db, extract);
   const reprocess = new ReprocessService(db, extract);
-  const clarifications = new ClarificationService(new ClarificationsRepository(db));
+  const v14Pipeline = new ExtractionPipelineV14Service(db, createOpenAiExtractorV14());
+  const inboxItemProcess =
+    deps.inboxItemProcess ??
+    new InboxItemProcessService(new InboxItemsRepository(db), v14Pipeline);
+  const clarifications = new ClarificationService(
+    new ClarificationsRepository(db),
+    v14Pipeline,
+  );
   const entitiesRepo = new EntitiesRepository(db);
   const search = new MemorySearchService(
     entitiesRepo,
@@ -81,17 +88,15 @@ export async function buildApp(deps: AppDeps = {}) {
   await registerTasksRoutes(app, new TasksRepository(db));
   await registerClarificationsRoutes(app, clarifications);
 
-  await registerTelegramWebhookRoutes(app, {
-    telegramInbox: new TelegramInboxService(processor),
-  });
-
-  const inboxItemProcess =
-    deps.inboxItemProcess ??
-    new InboxItemProcessService(
-      new InboxItemsRepository(db),
-      new ExtractionPipelineV14Service(db, createOpenAiExtractorV14()),
-    );
   await registerInternalInboxRoutes(app, { inboxItemProcess });
+
+  await registerTelegramWebhookRoutes(app, {
+    telegramInbox: new TelegramInboxService(
+      processor,
+      new InboxItemsRepository(db),
+      inboxItemProcess,
+    ),
+  });
 
   const auditService =
     deps.auditService ??

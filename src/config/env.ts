@@ -31,7 +31,17 @@ const envSchema = z.object({
   TELEGRAM_WEBHOOK_SECRET: z.string().min(1).optional(),
   TELEGRAM_WEBHOOK_URL: z.string().url().optional(),
   TELEGRAM_DEFAULT_TIMEZONE: z.string().min(1).default('America/Sao_Paulo'),
+  TELEGRAM_SENDER_ENTITY_REFERENCE: z.string().min(1).optional(),
   INTERNAL_PROCESSING_SECRET: z.string().min(1).optional(),
+  EXTERNAL_KNOWLEDGE_ENRICHMENT_ENABLED: z
+    .string()
+    .optional()
+    .transform((v) => v === 'true'),
+  WEB_SEARCH_PROVIDER: z.enum(['tavily', 'mock']).default('tavily'),
+  WEB_SEARCH_API_KEY: z.string().min(1).optional(),
+  ENRICHMENT_MAX_QUERIES_PER_RUN: z.coerce.number().int().positive().default(2),
+  ENRICHMENT_AUTO_APPLY_CONFIDENCE: z.coerce.number().min(0).max(1).default(0.9),
+  ENRICHMENT_SUGGEST_CONFIDENCE: z.coerce.number().min(0).max(1).default(0.6),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -98,4 +108,20 @@ export function resetEnvCache(): void {
 
 export function isOpenAiIntegrationEnabled(): boolean {
   return loadEnv().RUN_OPENAI_INTEGRATION_TESTS === true;
+}
+
+export function isExternalKnowledgeEnrichmentEnabled(): boolean {
+  return loadEnv().EXTERNAL_KNOWLEDGE_ENRICHMENT_ENABLED === true;
+}
+
+export function getEnrichmentOptions() {
+  const env = loadEnv();
+  return {
+    enabled: env.EXTERNAL_KNOWLEDGE_ENRICHMENT_ENABLED === true,
+    maxQueries: env.ENRICHMENT_MAX_QUERIES_PER_RUN,
+    autoApplyConfidence: env.ENRICHMENT_AUTO_APPLY_CONFIDENCE,
+    suggestConfidence: env.ENRICHMENT_SUGGEST_CONFIDENCE,
+    webSearchProvider: env.WEB_SEARCH_PROVIDER,
+    webSearchApiKey: env.WEB_SEARCH_API_KEY,
+  };
 }

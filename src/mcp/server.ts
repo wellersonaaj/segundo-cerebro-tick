@@ -33,6 +33,7 @@ import {
   listInboxItemEntities,
   listInboxItemEntitiesInputSchema,
 } from './tools/list-extraction-runs.tool.js';
+import { webLookup, webLookupInputSchema } from './tools/web-lookup.tool.js';
 
 async function main() {
   loadEnv();
@@ -118,6 +119,19 @@ async function main() {
         },
       },
       {
+        name: 'web_lookup',
+        description: 'Search the web for external knowledge (events, dates, entities)',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            query: { type: 'string' },
+            limit: { type: 'number' },
+            use_mock: { type: 'boolean' },
+          },
+          required: ['query'],
+        },
+      },
+      {
         name: 'list_inbox_extraction_runs',
         description: 'List extraction runs for an inbox item',
         inputSchema: {
@@ -166,6 +180,9 @@ async function main() {
             clarifications,
             listPendingClarificationsInputSchema.parse(args ?? {}),
           );
+          break;
+        case 'web_lookup':
+          result = await webLookup(webLookupInputSchema.parse(args ?? {}));
           break;
         case 'list_inbox_extraction_runs':
           result = await listInboxExtractionRuns(

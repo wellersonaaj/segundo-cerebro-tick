@@ -7,9 +7,10 @@ import {
   EXTRACTOR_V14_SCHEMA_VERSION,
   EXTRACTOR_V14_VERSION,
 } from '../openai/extractor-v1.4.prompt.js';
+import { InboxItemsRepository } from '../repositories/inbox-items.repository.js';
 import { ExtractionRunRpcRepository } from '../repositories/extraction-run-rpc.repository.js';
 import { ExtractionRunsV2Repository } from '../repositories/v2/extraction-runs-v2.repository.js';
-import type { InboxItem } from '../types/domain.js';
+import type { ExtractionTriggerType, InboxItem } from '../types/domain.js';
 import { log } from '../utils/logger.js';
 import { ExtractorV14CompileService } from './extractor-v14-compile.service.js';
 import type { InboxItemProcessPipeline } from './inbox-item-process.service.js';
@@ -21,6 +22,7 @@ export class ExtractionPipelineV14Service implements InboxItemProcessPipeline {
   private readonly runsV2Repo: ExtractionRunsV2Repository;
   private readonly persistenceV2: PersistenceV2Service;
   private readonly compileService: ExtractorV14CompileService;
+  private readonly inboxRepo: InboxItemsRepository;
 
   constructor(
     db: SupabaseClient,
@@ -30,15 +32,42 @@ export class ExtractionPipelineV14Service implements InboxItemProcessPipeline {
       runsV2Repo?: ExtractionRunsV2Repository;
       persistenceV2?: PersistenceV2Service;
       compileService?: ExtractorV14CompileService;
+      inboxRepo?: InboxItemsRepository;
     },
   ) {
     this.runRpc = deps?.runRpc ?? new ExtractionRunRpcRepository(db);
     this.runsV2Repo = deps?.runsV2Repo ?? new ExtractionRunsV2Repository(db);
     this.persistenceV2 = deps?.persistenceV2 ?? new PersistenceV2Service(db);
     this.compileService = deps?.compileService ?? new ExtractorV14CompileService(db, extractV14);
+    this.inboxRepo = deps?.inboxRepo ?? new InboxItemsRepository(db);
   }
 
   async run(inboxItem: InboxItem): Promise<{
+    inbox_item_id: string;
+    processing_status: 'completed' | 'failed';
+    extraction_run_id?: string;
+    extractor_version?: string | null;
+    needs_clarification?: boolean;
+  }> {
+    return this.runWithTrigger(inboxItem, 'initial');
+  }
+
+  async runReprocess(inboxItemId: string): Promise<{
+    inbox_item_id: string;
+    processing_status: 'completed' | 'failed';
+    extraction_run_id?: string;
+    extractor_version?: string | null;
+    needs_clarification?: boolean;
+  }> {
+    const inboxItem = await this.inboxRepo.findById(inboxItemId);
+    if (!inboxItem) throw new Error('Inbox item not found');
+    return this.runWithTrigger(inboxItem, 'reprocess');
+  }
+
+  async runWithTrigger(
+    inboxItem: InboxItem,
+    triggerType: ExtractionTriggerType,
+  ): Promise<{
     inbox_item_id: string;
     processing_status: 'completed' | 'failed';
     extraction_run_id?: string;
@@ -54,7 +83,7 @@ export class ExtractionPipelineV14Service implements InboxItemProcessPipeline {
 
       const start = await this.runRpc.startExtractionRun({
         inboxItemId: inboxItem.id,
-        triggerType: 'initial',
+        triggerType,
         schemaVersion: EXTRACTOR_V14_SCHEMA_VERSION,
         promptVersion: EXTRACTOR_V14_PROMPT_VERSION,
         extractorVersion: EXTRACTOR_V14_VERSION,

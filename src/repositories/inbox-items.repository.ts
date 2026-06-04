@@ -19,6 +19,8 @@ export interface CreateInboxItemInput {
   source_mode: SourceMode;
   received_at: string;
   timezone: string;
+  source_reference?: string | null;
+  metadata?: Record<string, unknown> | null;
 }
 
 export interface UpdateInboxStatusFields {
@@ -38,6 +40,8 @@ export class InboxItemsRepository {
         source_mode: input.source_mode,
         received_at: input.received_at,
         timezone: input.timezone,
+        source_reference: input.source_reference ?? null,
+        metadata: input.metadata ?? {},
         processing_status: 'pending',
         processed_at: null,
         processing_error: null,

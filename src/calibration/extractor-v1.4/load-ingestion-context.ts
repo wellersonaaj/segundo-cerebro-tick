@@ -4,8 +4,13 @@ import { fileURLToPath } from 'node:url';
 import {
   EMPTY_INGESTION_CONTEXT,
   type IngestionContext,
-  type SourceMetadata,
 } from '../../types/ingestion-context.js';
+import {
+  mergeSourceMetadata,
+  normalizeCaseSourceMetadata,
+} from '../../services/ingestion-context-metadata.js';
+
+export { mergeSourceMetadata, normalizeCaseSourceMetadata };
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -28,37 +33,3 @@ export function getIngestionContextById(id: string | undefined): IngestionContex
   return fixtures.contexts[id] ?? EMPTY_INGESTION_CONTEXT;
 }
 
-export function normalizeCaseSourceMetadata(
-  raw?: Partial<{
-    sender_reference?: string;
-    recipient_references?: string[];
-    thread_reference?: string;
-    reply_to_reference?: string;
-    subject?: string;
-    occurred_at?: string;
-  }>,
-): SourceMetadata {
-  if (!raw) return { entityLike: {}, routing: {} };
-  return {
-    entityLike: {
-      sender_reference: raw.sender_reference,
-      recipient_references: raw.recipient_references,
-    },
-    routing: {
-      thread_reference: raw.thread_reference,
-      reply_to_reference: raw.reply_to_reference,
-      subject: raw.subject,
-      occurred_at: raw.occurred_at,
-    },
-  };
-}
-
-export function mergeSourceMetadata(
-  base: SourceMetadata,
-  overlay: SourceMetadata,
-): SourceMetadata {
-  return {
-    entityLike: { ...base.entityLike, ...overlay.entityLike },
-    routing: { ...base.routing, ...overlay.routing },
-  };
-}

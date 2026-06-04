@@ -36,6 +36,9 @@ import {
   genericEntityTermDropNote,
   peripheralAmbiguityNote,
 } from '../config/mvp-registry-policy.js';
+import { isFirstPersonPronoun } from './first-person-pronoun-resolver.js';
+import { getBestFactForReference } from './external-knowledge-enrichment.service.js';
+import type { ExternalKnowledgeEnrichmentResult } from '../types/external-knowledge-enrichment.js';
 
 const EPISODIC_MIN_CONFIDENCE = 0.45;
 const STATIC_INPUT =
@@ -151,6 +154,18 @@ export class MemoryCompilerV2Service {
 
     for (const c of extractorOutput.clarification_candidates) {
       if (
+        c.issue_type === 'ambiguous_identity' &&
+        isFirstPersonPronoun(c.target_reference)
+      ) {
+        const euResolved =
+          resolverResult.byReferenceText.get('eu') ??
+          resolverResult.byReferenceText.get(normalizeText('eu'));
+        if (euResolved?.status === 'resolved') {
+          compilerNotes.push(`first_person_resolved: ${c.target_reference}`);
+          continue;
+        }
+      }
+      if (
         (c.issue_type === 'ambiguous_identity' || c.issue_type === 'ambiguous_entity_type') &&
         !isMvpRegistryEligibleReference(c.target_reference, extractorOutput)
       ) {
@@ -187,6 +202,15 @@ export class MemoryCompilerV2Service {
       extractorOutput,
     );
 
+    this.applyExternalEnrichment(
+      events,
+      clarificationCandidates,
+      compilerNotes,
+      input.externalEnrichment,
+      input.enrichmentAutoApplyConfidence ?? 0.9,
+      input.enrichmentSuggestConfidence ?? 0.6,
+    );
+
     return {
       compilerVersion: MEMORY_COMPILER_V2_VERSION,
       resolvedEntities,
@@ -202,7 +226,51 @@ export class MemoryCompilerV2Service {
       flags,
       taskSignalResolutions,
       contextResolutionEvidence: evidence,
+      enrichmentEvidence: input.externalEnrichment,
     };
+  }
+
+  private applyExternalEnrichment(
+    events: CompiledEventV2[],
+    clarifications: CompiledClarificationCandidateV2[],
+    notes: string[],
+    enrichment: ExternalKnowledgeEnrichmentResult | undefined,
+    autoApplyConfidence: number,
+    suggestConfidence: number,
+  ): void {
+    if (!enrichment || enrichment.status !== 'resolved' || !enrichment.facts.length) {
+      return;
+    }
+
+    for (const event of events) {
+      const fact =
+        getBestFactForReference(enrichment.facts, event.title) ??
+        enrichment.facts.find((f) => f.field === 'occurred_at');
+      if (!fact) continue;
+
+      if (
+        fact.field === 'occurred_at' &&
+        fact.occurredAtIso &&
+        fact.confidence >= autoApplyConfidence &&
+        !event.occurredAt
+      ) {
+        event.occurredAt = fact.occurredAtIso;
+        notes.push(`external_enrichment_applied: ${fact.matchedReference}`);
+      } else if (fact.confidence >= suggestConfidence) {
+        notes.push(`external_enrichment_suggested: ${fact.matchedReference}`);
+        const existing = clarifications.find(
+          (c) => normalizeText(c.targetReference) === normalizeText(fact.matchedReference),
+        );
+        const suggestion = fact.occurredAtIso
+          ? `${fact.occurredAtIso.replace('/', ' a ')} (fonte: ${fact.sourceUrl ?? fact.sourceLabel})`
+          : `${fact.claim} (fonte: ${fact.sourceUrl ?? fact.sourceLabel})`;
+        if (existing) {
+          if (!existing.suggestedAnswers.includes(suggestion)) {
+            existing.suggestedAnswers = [...existing.suggestedAnswers, suggestion];
+          }
+        }
+      }
+    }
   }
 
   private lookup(resolver: MemoryResolverResult, ref: string): ResolvedReference {

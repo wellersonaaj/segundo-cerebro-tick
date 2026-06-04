@@ -7,6 +7,7 @@ import type {
 } from './ingestion-context.js';
 import type { MemoryResolverResult } from '../services/reference-resolver.service.js';
 import type { NormalizedTemporalValue } from './temporal-normalization.js';
+import type { ExternalKnowledgeEnrichmentResult } from './external-knowledge-enrichment.js';
 
 export interface TemporalAnchor {
   receivedAt: string;
@@ -172,6 +173,7 @@ export interface CompiledMemoryV2 {
   flags: CompilerFlagsV2;
   taskSignalResolutions: TaskSignalContextResolution[];
   contextResolutionEvidence: ContextResolutionEvidence[];
+  enrichmentEvidence?: ExternalKnowledgeEnrichmentResult;
 }
 
 export interface MemoryCompilerV2Input {
@@ -182,4 +184,7 @@ export interface MemoryCompilerV2Input {
   compactIngestionContext?: CompactIngestionContext;
   taskSignalResolutions?: TaskSignalContextResolution[];
   temporalAnchor?: TemporalAnchor;
+  externalEnrichment?: ExternalKnowledgeEnrichmentResult;
+  enrichmentAutoApplyConfidence?: number;
+  enrichmentSuggestConfidence?: number;
 }

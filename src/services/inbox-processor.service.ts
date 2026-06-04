@@ -22,6 +22,8 @@ export interface ProcessInboxInput {
   source_mode: SourceMode;
   received_at: string;
   timezone: string;
+  source_reference?: string | null;
+  metadata?: Record<string, unknown> | null;
 }
 
 export class InboxProcessorService {
