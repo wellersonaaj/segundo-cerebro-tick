@@ -45,9 +45,7 @@ export function isSocialCommitmentTaskSignal(
     return true;
   }
   return output.events.some(
-    (ev) =>
-      (ev.event_kind === 'meeting' || ev.event_kind === 'conversation') &&
-      isPersonalMeetingEvent(ev, output),
+    (ev) => ev.event_kind === 'meeting' && isPersonalMeetingEvent(ev, output),
   );
 }
 

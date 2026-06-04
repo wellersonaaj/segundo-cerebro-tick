@@ -18,7 +18,7 @@ const EXCERPT_TEMPORAL_LITERAL_PATTERNS: RegExp[] = [
 
 const PRIVATE_REGISTRY_ENTITY_TYPES = new Set(['person', 'company']);
 
-const PERSONAL_EVENT_KINDS = new Set(['meeting', 'conversation']);
+const PERSONAL_EVENT_KINDS = new Set(['meeting']);
 
 export function excerptHasRelativeTemporalHint(text: string): boolean {
   return RELATIVE_TEMPORAL_HINT.test(text);

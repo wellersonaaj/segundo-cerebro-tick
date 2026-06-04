@@ -1,8 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ExtractorOutputV14 } from '../openai/extractor-v1.4.types.js';
-import type { InboxItem, InboxItemRow } from '../types/domain.js';
+import type { InboxItem } from '../types/domain.js';
+import { InboxItemsRepository, type InboxItemRow } from '../repositories/inbox-items.repository.js';
 import { normalizeText } from '../utils/normalize.js';
-import { InboxItemsRepository } from '../repositories/inbox-items.repository.js';
 import { ExtractionRunsV2Repository } from '../repositories/v2/extraction-runs-v2.repository.js';
 import { resolveThreadIdFromInbox } from './assistant-session.service.js';
 
