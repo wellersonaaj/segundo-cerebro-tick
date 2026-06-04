@@ -43,6 +43,7 @@ function createMockDeps(overrides?: {
     },
     clarificationsRepo: {
       listPendingByInboxItem: vi.fn(async () => [] as ClarificationRequest[]),
+      listAnsweredByInboxItem: vi.fn(async () => [] as ClarificationRequest[]),
     },
     clarificationService: null,
     taskAuditRepo: {

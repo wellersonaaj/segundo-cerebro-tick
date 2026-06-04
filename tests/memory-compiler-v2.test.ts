@@ -309,7 +309,8 @@ describe('MemoryCompilerV2Service', () => {
     expect(
       compiled.clarificationCandidates.some((c) => c.issueType === 'status_update_missing_value'),
     ).toBe(true);
-    expect(compiled.decision.status).toBe('needs_clarification');
+    // knowledge_confirmation → non-blocking no materiality; candidato persiste sem travar decision.
+    expect(compiled.decision.status).toBe('accepted');
   });
 
   it('ambiguous identity → clarification após manager', () => {
