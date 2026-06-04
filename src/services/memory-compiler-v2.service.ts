@@ -40,6 +40,12 @@ import {
 import { isFirstPersonPronoun } from './first-person-pronoun-resolver.js';
 import { getBestFactForReference } from './external-knowledge-enrichment.service.js';
 import type { ExternalKnowledgeEnrichmentResult } from '../types/external-knowledge-enrichment.js';
+import {
+  extractTemporalLiteralsFromExcerpt,
+  excerptHasRelativeTemporalHint,
+  shouldAutoApplyEnrichmentToEvent,
+} from './enrichment-eligibility.js';
+import type { ExtractedEvent } from '../openai/extractor-v1.4.types.js';
 
 const EPISODIC_MIN_CONFIDENCE = 0.45;
 const STATIC_INPUT =
@@ -113,6 +119,7 @@ export class MemoryCompilerV2Service {
       clarificationCandidates,
       dropped,
       compilerNotes,
+      input.temporalAnchor,
     );
 
     const assertions = this.compileAssertions(
@@ -248,6 +255,8 @@ export class MemoryCompilerV2Service {
     }
 
     for (const event of events) {
+      if (!shouldAutoApplyEnrichmentToEvent(event)) continue;
+
       const fact =
         getBestFactForReference(enrichment.facts, event.title) ??
         enrichment.facts.find((f) => f.field === 'occurred_at');
@@ -520,6 +529,7 @@ export class MemoryCompilerV2Service {
     clarifications: CompiledClarificationCandidateV2[],
     dropped: DroppedArtifactV2[],
     notes: string[],
+    temporalAnchor?: TemporalAnchor,
   ): CompiledEventV2[] {
     if (isStaticContext && output.events.length > 0) {
       for (const ev of output.events) {
@@ -589,7 +599,7 @@ export class MemoryCompilerV2Service {
       events.push({
         eventKind: ev.event_kind,
         title: ev.title,
-        occurredAt: ev.occurred_at,
+        occurredAt: this.resolveEventOccurredAt(ev, temporalAnchor, notes),
         episodicConfidence: ev.episodic_confidence,
         sourceExcerpt: ev.source_excerpt,
         confidence: ev.episodic_confidence,
@@ -599,6 +609,30 @@ export class MemoryCompilerV2Service {
     }
 
     return events;
+  }
+
+  private resolveEventOccurredAt(
+    ev: ExtractedEvent,
+    temporalAnchor: TemporalAnchor | undefined,
+    notes: string[],
+  ): string | null {
+    if (ev.occurred_at?.trim()) return ev.occurred_at;
+    if (!temporalAnchor?.receivedAt?.trim()) return null;
+    if (!excerptHasRelativeTemporalHint(ev.source_excerpt)) return null;
+
+    const literals = extractTemporalLiteralsFromExcerpt(ev.source_excerpt);
+    for (const literal of literals) {
+      const normalized = this.temporalNormalizer.normalize({
+        literal,
+        receivedAt: temporalAnchor.receivedAt,
+        timezone: temporalAnchor.timezone,
+      });
+      if (normalized.status === 'resolved' && normalized.localDate) {
+        notes.push(`event_temporal_normalized: ${literal}`);
+        return normalized.instant ?? normalized.localDate;
+      }
+    }
+    return null;
   }
 
   private applyCorrectionSignals(

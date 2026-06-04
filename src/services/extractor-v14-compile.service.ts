@@ -130,6 +130,7 @@ export class ExtractorV14CompileService {
         autoApplyConfidence: enrichmentOpts.autoApplyConfidence,
         suggestConfidence: enrichmentOpts.suggestConfidence,
         searchProvider,
+        resolverResult,
       },
     );
 

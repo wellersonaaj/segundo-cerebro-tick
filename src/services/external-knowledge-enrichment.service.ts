@@ -9,6 +9,8 @@ import {
 } from '../types/external-knowledge-enrichment.js';
 import { normalizeText } from '../utils/normalize.js';
 import { buildSearchQueries, scanEnrichmentTriggers } from './enrichment-trigger-scanner.js';
+import { filterEnrichmentTriggers } from './enrichment-eligibility.js';
+import type { MemoryResolverResult } from './reference-resolver.service.js';
 import type { WebSearchProvider } from './web-search/web-search-provider.js';
 
 const DATE_RANGE_RE =
@@ -70,12 +72,24 @@ function extractDateRangeFromText(text: string, year: number): string | null {
   return `${y}-${pad2(month)}-${pad2(d1)}/${y}-${pad2(month)}-${pad2(d2)}`;
 }
 
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function nameMatchScore(reference: string, snippet: WebSearchSnippet): number {
   const refNorm = normalizeText(reference).replace(/\s/g, '');
-  const blobNorm = normalizeText(`${snippet.title} ${snippet.content}`).replace(/\s/g, '');
-  if (refNorm.length >= 3 && blobNorm.includes(refNorm)) return 1;
-  const refTokens = normalizeText(reference).split(/\s+/).filter(Boolean);
   const blob = normalizeText(`${snippet.title} ${snippet.content}`);
+  const blobNorm = blob.replace(/\s/g, '');
+
+  if (refNorm.length >= 6 && blobNorm.includes(refNorm)) return 1;
+
+  if (refNorm.length >= 3 && refNorm.length <= 5) {
+    const re = new RegExp(`\\b${escapeRegex(refNorm)}\\b`, 'i');
+    if (re.test(blob)) return 0.95;
+    return 0;
+  }
+
+  const refTokens = normalizeText(reference).split(/\s+/).filter(Boolean);
   let hits = 0;
   for (const t of refTokens) {
     if (t.length >= 3 && blob.includes(t)) hits++;
@@ -147,6 +161,7 @@ export interface ExternalKnowledgeEnrichmentOptions {
   autoApplyConfidence: number;
   suggestConfidence: number;
   searchProvider: WebSearchProvider | null;
+  resolverResult?: MemoryResolverResult;
 }
 
 export class ExternalKnowledgeEnrichmentService {
@@ -168,7 +183,10 @@ export class ExternalKnowledgeEnrichmentService {
       return { ...base, reasonCode: options.enabled ? 'no_provider' : 'disabled' };
     }
 
-    const triggers = scanEnrichmentTriggers(output, receivedAt);
+    const rawTriggers = scanEnrichmentTriggers(output, receivedAt);
+    const triggers = options.resolverResult
+      ? filterEnrichmentTriggers(rawTriggers, output, options.resolverResult)
+      : rawTriggers;
     if (!triggers.length) {
       return { ...base, status: 'skipped', reasonCode: 'no_triggers' };
     }

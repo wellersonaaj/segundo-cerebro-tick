@@ -3,14 +3,9 @@ import {
   isMvpAutoRegistryEntityType,
   isReferenceCentralToTaskSignals,
 } from '../config/mvp-registry-policy.js';
+import { excerptHasRelativeTemporalHint } from './enrichment-eligibility.js';
 import { normalizeText } from '../utils/normalize.js';
 import type { EnrichmentTrigger } from '../types/external-knowledge-enrichment.js';
-
-const TEMPORAL_HINT =
-  /\b(semana que vem|pr[oó]xima semana|amanh[aã]|hoje|ontem|m[eê]s que vem|\d{1,2}\/\d{1,2})\b/i;
-
-const PRIVATE_PERSON_CONTEXT =
-  /\b(nova colaboradora|nosso time|minha equipe|colega|namorad[oa]|irm[aã]|pai|m[aã]e)\b/i;
 
 function inferYear(receivedAt: string | undefined): number {
   if (receivedAt?.trim()) {
@@ -48,7 +43,7 @@ export function scanEnrichmentTriggers(
 
   for (const ev of output.events) {
     const titleNorm = normalizeText(ev.title);
-    const hasTemporal = TEMPORAL_HINT.test(ev.source_excerpt);
+    const hasTemporal = excerptHasRelativeTemporalHint(ev.source_excerpt);
     const namedInEvent = ev.related_entities.some((r) =>
       isProperNounLike(r.entity_reference),
     );
@@ -69,11 +64,12 @@ export function scanEnrichmentTriggers(
       }
     }
 
-    if (ev.occurred_at == null && hasTemporal && namedInEvent) {
+    // Missing absolute date without relative temporal language → external discovery (e.g. public events).
+    if (ev.occurred_at == null && !hasTemporal && namedInEvent) {
       const primaryRef =
         ev.related_entities.find((r) => isProperNounLike(r.entity_reference))
           ?.entity_reference ?? ev.title;
-      if (isProperNounLike(primaryRef) && !PRIVATE_PERSON_CONTEXT.test(ev.source_excerpt)) {
+      if (isProperNounLike(primaryRef)) {
         add({
           targetReference: primaryRef,
           gapKind: 'missing_event_date',

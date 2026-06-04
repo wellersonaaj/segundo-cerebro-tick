@@ -150,6 +150,7 @@ describe('identity and enrichment e2e (unit chain)', () => {
         searchProvider: new MockWebSearchProvider(
           new Map([['websummit rio', websummitRioMockSnippets()]]),
         ),
+        resolverResult,
       },
     );
 

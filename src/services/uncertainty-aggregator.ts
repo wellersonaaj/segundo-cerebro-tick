@@ -1,8 +1,21 @@
 import type { ExtractorOutputV14, ReviewHint } from '../openai/extractor-v1.4.types.js';
 import type { ClarificationRequest } from '../types/domain.js';
 import type { EnrichmentTrigger } from '../types/external-knowledge-enrichment.js';
+import {
+  excerptHasRelativeTemporalHint,
+  isPersonalMeetingEvent,
+} from './enrichment-eligibility.js';
 import { normalizeText } from '../utils/normalize.js';
 import { isTelegramPromptableClarification } from '../telegram/telegram-metadata.js';
+
+const REVIEW_HINT_PRIORITY: Record<ReviewHint['issue_type'], number> = {
+  ambiguous_identity: 90,
+  unresolved_reference: 85,
+  ambiguous_entity_type: 80,
+  possible_contradiction: 70,
+  low_confidence_event: 60,
+  other: 50,
+};
 
 export type UncertaintyGapKind =
   | 'clarification'
@@ -20,18 +33,6 @@ export interface UncertaintyGap {
   clarification_id?: string;
   priority: number;
 }
-
-const TEMPORAL_HINT =
-  /\b(semana que vem|pr[oó]xima semana|amanh[aã]|hoje|ontem|m[eê]s que vem|sexta|segunda|terça|quarta|quinta|sábado|domingo|\d{1,2}\/\d{1,2})\b/i;
-
-const REVIEW_HINT_PRIORITY: Record<ReviewHint['issue_type'], number> = {
-  ambiguous_identity: 90,
-  unresolved_reference: 85,
-  ambiguous_entity_type: 80,
-  possible_contradiction: 70,
-  low_confidence_event: 60,
-  other: 50,
-};
 
 function isProperNounLike(text: string): boolean {
   const t = text.trim();
@@ -129,14 +130,12 @@ export function aggregateUncertaintyGaps(input: {
 
     for (const ev of output.events) {
       if (ev.occurred_at != null) continue;
-      if (!TEMPORAL_HINT.test(ev.source_excerpt)) continue;
-      const ref =
-        ev.related_entities.find((r) => isProperNounLike(r.entity_reference))?.entity_reference ??
-        ev.title;
+      if (excerptHasRelativeTemporalHint(ev.source_excerpt)) continue;
+      if (isPersonalMeetingEvent(ev, output)) continue;
       add({
         kind: 'temporal',
-        target_reference: ref,
-        question: `Quando acontece ${ref}?`,
+        target_reference: ev.title,
+        question: `Qual a data de "${ev.title}"?`,
         suggested_answers: [],
         source_excerpt: ev.source_excerpt,
         priority: 60,
