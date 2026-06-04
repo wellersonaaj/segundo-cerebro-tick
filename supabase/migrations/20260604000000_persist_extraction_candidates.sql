@@ -46,8 +46,7 @@ begin
     insert into entities (name, canonical_name, entity_type, normalized_name, registry_status, created_by_extraction_run_id)
     values (v_entity.name, v_entity.name, v_entity.entity_type, v_entity.normalized_name, 'candidate', p_extraction_run_id)
     on conflict (normalized_name) where registry_status in ('active', 'candidate')
-    do update set updated_at = now()
-    returning id;
+    do update set updated_at = now();
   end loop;
 
   -- Build entity_id lookup map by normalized_name
