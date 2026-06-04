@@ -39,6 +39,29 @@ export function peripheralAmbiguityNote(referenceText: string): string {
   return `peripheral_ambiguity_ignored: ${referenceText}`;
 }
 
+/**
+ * True when a reference is the explicit target or named subject of a task signal
+ * (e.g. "ESX" in target_reference or task title), not merely incidental context.
+ */
+export function isReferenceCentralToTaskSignals(
+  referenceText: string,
+  taskSignals: ExtractorOutputV14['task_signals'],
+): boolean {
+  const refNorm = normalizeText(referenceText);
+  if (!refNorm || refNorm.length < 2) return false;
+
+  for (const task of taskSignals) {
+    if (task.target_reference && normalizeText(task.target_reference) === refNorm) {
+      return true;
+    }
+    const titleNorm = normalizeText(task.title);
+    if (titleNorm.includes(refNorm)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /** S3.1: exact-match blocklist — generic or metalinguistic terms must not become canonical entities. */
 export const MVP_BLOCKED_GENERIC_ENTITY_TERMS = [
   'cliente',

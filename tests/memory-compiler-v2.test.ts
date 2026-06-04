@@ -507,6 +507,111 @@ describe('MemoryCompilerV2Service', () => {
     ).toHaveLength(0);
   });
 
+  it('keeps KC ambiguous_entity_type when reference is central to a task (ESX)', () => {
+    const output = parseExtractorOutputV14({
+      schema_version: '1.4',
+      events: [],
+      aliases: [],
+      assertions: [],
+      task_signals: [
+        {
+          title: 'Descobrir se ir ao ESX será bom para a Velt',
+          due_at: null,
+          operation: 'create',
+          task_kind: 'follow_up',
+          confidence: 0.9,
+          status_signal: 'open',
+          blocked_reason: null,
+          source_excerpt: 'Preciso descobrir se ir ao ESX vai ser bom para nós da Velt',
+          task_reference: null,
+          target_reference: 'ESX',
+          project_reference: null,
+          assignee_reference: null,
+          source_block_reference: '[SOURCE_BLOCK:raw]',
+        },
+      ],
+      review_hints: [],
+      extraction_notes: [],
+      correction_signals: [],
+      entity_mentions: [
+        {
+          mention_text: 'ESX',
+          suggested_entity_type: 'other',
+          source_excerpt: 'ir ao ESX',
+          confidence: 0.9,
+        },
+        {
+          mention_text: 'Velt',
+          suggested_entity_type: 'company',
+          source_excerpt: 'nós da Velt',
+          confidence: 0.95,
+        },
+      ],
+      clarification_candidates: [
+        {
+          target_type: 'entity',
+          target_reference: 'ESX',
+          issue_type: 'ambiguous_entity_type',
+          question: 'O que é ESX?',
+          reason: 'tipo não resolvido',
+          priority: 'medium',
+          blocking_scope: 'knowledge_confirmation',
+          suggested_answers: ['conferência', 'local', 'produto'],
+          source_excerpt: 'ir ao ESX',
+          source_block_reference: '[SOURCE_BLOCK:raw]',
+          confidence: 0.75,
+        },
+        {
+          target_type: 'task',
+          target_reference: 'Descobrir se ir ao ESX será bom para a Velt',
+          issue_type: 'missing_assignee_or_due_date',
+          question: 'Quem e prazo?',
+          reason: 'sem responsável',
+          priority: 'high',
+          blocking_scope: 'task_execution',
+          suggested_answers: [],
+          source_excerpt: 'Preciso descobrir',
+          source_block_reference: '[SOURCE_BLOCK:raw]',
+          confidence: 0.9,
+        },
+      ],
+    });
+    const resolver = new ReferenceResolverService(registry.entities);
+    const resolverResult = resolver.resolveReferences(collectReferenceTextsFromExtractor(output));
+    const compiled = new MemoryCompilerV2Service().compile({
+      extractorOutput: output,
+      effectiveInput: '[SOURCE_BLOCK:raw]\nPreciso descobrir se ir ao ESX vai ser bom para nós da Velt',
+      resolverResult,
+    });
+
+    expect(
+      compiled.clarificationCandidates.some(
+        (c) => c.targetReference === 'ESX' && c.issueType === 'ambiguous_entity_type',
+      ),
+    ).toBe(true);
+    expect(
+      compiled.compilerNotes.filter((n) => n.includes('peripheral_ambiguity_ignored: ESX')),
+    ).toHaveLength(1);
+
+    const materiality = new ClarificationManagerV2Service().classify({
+      llmCandidates: compiled.clarificationCandidates.filter((c) => c.source === 'llm'),
+      compilerCandidates: compiled.clarificationCandidates.filter((c) => c.source !== 'llm'),
+      resolverResult,
+      flags: compiled.flags,
+      extractorOutput: output,
+      compiled: {
+        tasks: compiled.tasks,
+        assertions: compiled.assertions,
+        events: compiled.events,
+      },
+      effectiveInput: 'ESX',
+    });
+    const esxKc = materiality.nonBlocking.filter(
+      (c) => c.targetReference === 'ESX' && c.blockingScope === 'knowledge_confirmation',
+    );
+    expect(esxKc.length).toBe(1);
+  });
+
   it('S3.1: termos genéricos/metalinguísticos não entram em resolvedEntities', () => {
     const blocked = [
       'cliente',

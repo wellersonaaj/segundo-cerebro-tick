@@ -34,6 +34,7 @@ import {
   isMvpBlockedGenericEntityTerm,
   isMvpRegistryEligibleReference,
   genericEntityTermDropNote,
+  isReferenceCentralToTaskSignals,
   peripheralAmbiguityNote,
 } from '../config/mvp-registry-policy.js';
 import { isFirstPersonPronoun } from './first-person-pronoun-resolver.js';
@@ -167,7 +168,11 @@ export class MemoryCompilerV2Service {
       }
       if (
         (c.issue_type === 'ambiguous_identity' || c.issue_type === 'ambiguous_entity_type') &&
-        !isMvpRegistryEligibleReference(c.target_reference, extractorOutput)
+        !isMvpRegistryEligibleReference(c.target_reference, extractorOutput) &&
+        !(
+          c.blocking_scope === 'knowledge_confirmation' &&
+          isReferenceCentralToTaskSignals(c.target_reference, extractorOutput.task_signals)
+        )
       ) {
         compilerNotes.push(peripheralAmbiguityNote(c.target_reference));
         continue;

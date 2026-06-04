@@ -3,6 +3,7 @@ import {
   isMvpAutoRegistryEntityType,
   isMvpBlockedGenericEntityTerm,
   isMvpRegistryEligibleReference,
+  isReferenceCentralToTaskSignals,
   MVP_AUTO_REGISTRY_ENTITY_TYPES,
   MVP_BLOCKED_GENERIC_ENTITY_TERMS,
 } from '../src/config/mvp-registry-policy.js';
@@ -55,5 +56,28 @@ describe('mvp-registry-policy (S1)', () => {
     expect(isMvpBlockedGenericEntityTerm('cliente')).toBe(true);
     expect(isMvpBlockedGenericEntityTerm('VELT')).toBe(false);
     expect(isMvpBlockedGenericEntityTerm('Bruno Brant')).toBe(false);
+  });
+
+  it('task-central reference matches target_reference or title', () => {
+    const tasks = [
+      {
+        title: 'Descobrir se ir ao ESX será bom para a Velt',
+        due_at: null,
+        operation: 'create' as const,
+        task_kind: 'follow_up' as const,
+        confidence: 0.9,
+        status_signal: 'open' as const,
+        blocked_reason: null,
+        source_excerpt: 'Preciso descobrir se ir ao ESX vai ser bom para nós da Velt',
+        task_reference: null,
+        target_reference: 'ESX',
+        project_reference: null,
+        assignee_reference: null,
+        source_block_reference: '[SOURCE_BLOCK:raw]',
+      },
+    ];
+    expect(isReferenceCentralToTaskSignals('ESX', tasks)).toBe(true);
+    expect(isReferenceCentralToTaskSignals('reunião sobre a integração', tasks)).toBe(false);
+    expect(isReferenceCentralToTaskSignals('ESX', [])).toBe(false);
   });
 });
