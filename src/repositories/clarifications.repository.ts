@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ClarificationRequest, ClarificationStatus, ExtractedClarification } from '../types/domain.js';
+import { normalizeText } from '../utils/normalize.js';
 
 export class ClarificationsRepository {
   constructor(private readonly db: SupabaseClient) {}
@@ -21,6 +22,7 @@ export class ClarificationsRepository {
       extraction_run_id: extractionRunId,
       target_type: c.target_type,
       target_reference: c.target_reference,
+      normalized_target_reference: normalizeText(c.target_reference ?? ''),
       issue_type: c.issue_type,
       question: c.question,
       reason: c.reason,

@@ -187,11 +187,12 @@ export class AssistantTurnService {
     const inbox = await this.inboxRepo.findById(inboxItemId);
     const rawContent = inbox?.raw_content ?? input.text;
 
-    const [tasks, clarificationsInitial, extractorOutput, enrichment] = await Promise.all([
+    const [tasks, clarificationsInitial, extractorOutput, enrichment, compiled] = await Promise.all([
       this.taskAuditRepo.listByInboxItem(inboxItemId),
       this.clarificationsRepo.listPendingByInboxItem(inboxItemId),
       this.loadExtractorOutput(pipelineResult.extraction_run_id),
       this.loadEnrichmentEvidence(pipelineResult.extraction_run_id),
+      this.loadCompiledOutput(pipelineResult.extraction_run_id),
     ]);
 
     let clarifications = clarificationsInitial;
@@ -202,9 +203,10 @@ export class AssistantTurnService {
       extractorOutput,
       maxGaps: 2,
       sourceMode,
+      resolvedEntities: compiled?.resolvedEntities ?? null,
     });
 
-    const ephemeral = filterPersistableEphemeralGaps(gaps);
+    const ephemeral = filterPersistableEphemeralGaps(gaps, clarifications);
     if (ephemeral.length) {
       await persistEphemeralUncertaintyGaps(
         this.clarificationsRepo,
@@ -218,6 +220,7 @@ export class AssistantTurnService {
         extractorOutput,
         maxGaps: 2,
         sourceMode,
+        resolvedEntities: compiled?.resolvedEntities ?? null,
       });
     }
 
@@ -345,15 +348,21 @@ export class AssistantTurnService {
     return run.parsed_output as ExtractorOutputV14;
   }
 
+  private async loadCompiledOutput(runId: string | undefined): Promise<CompiledMemoryV2 | null> {
+    if (!runId) return null;
+    const run = await this.runsV2Repo.findById(runId);
+    if (!run?.compiled_output) return null;
+    return run.compiled_output as CompiledMemoryV2;
+  }
+
   private async loadEnrichmentEvidence(
     runId: string | undefined,
   ): Promise<ExternalKnowledgeEnrichmentResult | null> {
-    if (!runId) return null;
-    const run = await this.runsV2Repo.findById(runId);
-    const compiled = run?.compiled_output as (CompiledMemoryV2 & {
-      enrichmentEvidence?: ExternalKnowledgeEnrichmentResult;
-    }) | null;
-    return compiled?.enrichmentEvidence ?? null;
+    const compiled = await this.loadCompiledOutput(runId);
+    return (
+      (compiled as (CompiledMemoryV2 & { enrichmentEvidence?: ExternalKnowledgeEnrichmentResult }) | null)
+        ?.enrichmentEvidence ?? null
+    );
   }
 
   static threadIdForTelegramChat(chatId: number): string {

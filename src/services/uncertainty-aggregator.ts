@@ -1,4 +1,5 @@
 import type { ExtractorOutputV14, ReviewHint } from '../openai/extractor-v1.4.types.js';
+import type { CompiledEntityReference } from '../types/memory-compiler-v2.js';
 import type { ClarificationRequest } from '../types/domain.js';
 import type { EnrichmentTrigger } from '../types/external-knowledge-enrichment.js';
 import {
@@ -60,6 +61,7 @@ export function aggregateUncertaintyGaps(input: {
   maxGaps?: number;
   sourceMode?: SourceMode;
   resolverResult?: MemoryResolverResult | null;
+  resolvedEntities?: CompiledEntityReference[] | null;
 }): UncertaintyGap[] {
   const max = input.maxGaps ?? 2;
   const seen = new Set<string>();
@@ -101,6 +103,13 @@ export function aggregateUncertaintyGaps(input: {
         hint.issue_type === 'unresolved_reference' ||
         hint.issue_type === 'ambiguous_entity_type'
       ) {
+        if (
+          isThirdPersonObjectPronoun(ref) &&
+          (isPronounResolvedInRegistry(ref, input.resolverResult) ||
+            isPronounResolvedInCompiledEntities(ref, input.resolvedEntities))
+        ) {
+          continue;
+        }
         add({
           kind: 'review_hint',
           target_reference: ref,
@@ -185,8 +194,35 @@ function isPronounResolvedInRegistry(
   return hit?.status === 'resolved' && hit.entity_id != null;
 }
 
-export function filterPersistableEphemeralGaps(gaps: UncertaintyGap[]): UncertaintyGap[] {
-  return gaps.filter((g) => !g.clarification_id);
+function isPronounResolvedInCompiledEntities(
+  reference: string,
+  resolvedEntities?: CompiledEntityReference[] | null,
+): boolean {
+  if (!resolvedEntities?.length) return false;
+  const key = normalizeText(reference);
+  const hit = resolvedEntities.find((e) => normalizeText(e.mentionText) === key);
+  return hit?.resolutionStatus === 'resolved' && hit.entityId != null;
+}
+
+export function filterPersistableEphemeralGaps(
+  gaps: UncertaintyGap[],
+  clarifications: ClarificationRequest[] = [],
+): UncertaintyGap[] {
+  const pendingRefs = new Set(
+    clarifications
+      .filter((c) => c.status === 'pending')
+      .map((c) => normalizeText(c.target_reference ?? '')),
+  );
+
+  return gaps.filter((g) => {
+    if (g.clarification_id) return false;
+    const ref = normalizeText(g.target_reference);
+    if (pendingRefs.has(ref)) return false;
+    if (g.kind === 'review_hint' && isThirdPersonObjectPronoun(g.target_reference)) {
+      return false;
+    }
+    return true;
+  });
 }
 
 export function uncertaintyGapsToEnrichmentTriggers(

@@ -28,7 +28,7 @@ import {
   suppressPronounClarifications,
 } from './implicit-assignee.service.js';
 import {
-  collectResolvedThreadPronouns,
+  collectResolvedObjectPronouns,
   isThirdPersonObjectPronoun,
 } from './pronoun-coreference.service.js';
 
@@ -106,7 +106,7 @@ export class ExtractorV14CompileService {
       threadContext,
     );
 
-    const resolvedPronouns = collectResolvedThreadPronouns(resolverResult);
+    const resolvedPronouns = collectResolvedObjectPronouns(resolverResult);
     output = suppressPronounClarifications(output, resolvedPronouns);
     const taskSignalResolutions = this.taskResolver.resolveTaskSignals(
       output.task_signals ?? [],

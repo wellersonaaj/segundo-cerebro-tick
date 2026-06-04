@@ -10,7 +10,7 @@ import {
 } from './reference-resolver.service.js';
 import type { ExtractorOutputV14 } from '../openai/extractor-v1.4.types.js';
 import { applyFirstPersonPronounToResolverResult } from './first-person-pronoun-resolver.js';
-import { applyThreadPronounCoreference } from './pronoun-coreference.service.js';
+import { applyInTextPronounCoreference, applyThreadPronounCoreference } from './pronoun-coreference.service.js';
 import type { ThreadConversationContext } from './thread-conversation-context.service.js';
 import { normalizeText } from '../utils/normalize.js';
 
@@ -38,6 +38,7 @@ export class DbReferenceResolverService {
         : null;
 
     result = applyFirstPersonPronounToResolverResult(result, sourceMode, senderResolved);
+    result = applyInTextPronounCoreference(result, output);
     result = applyThreadPronounCoreference(result, sourceMode, threadContext);
     return result;
   }

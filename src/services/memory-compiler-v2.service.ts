@@ -38,6 +38,7 @@ import {
   peripheralAmbiguityNote,
 } from '../config/mvp-registry-policy.js';
 import { isFirstPersonPronoun } from './first-person-pronoun-resolver.js';
+import { isThirdPersonObjectPronoun } from './pronoun-coreference.service.js';
 import { getBestFactForReference } from './external-knowledge-enrichment.service.js';
 import type { ExternalKnowledgeEnrichmentResult } from '../types/external-knowledge-enrichment.js';
 import {
@@ -161,6 +162,18 @@ export class MemoryCompilerV2Service {
     }));
 
     for (const c of extractorOutput.clarification_candidates) {
+      if (
+        c.issue_type === 'ambiguous_identity' &&
+        isThirdPersonObjectPronoun(c.target_reference)
+      ) {
+        const pronounHit =
+          resolverResult.byReferenceText.get(c.target_reference) ??
+          resolverResult.byReferenceText.get(normalizeText(c.target_reference));
+        if (pronounHit?.status === 'resolved' && pronounHit.entity_id) {
+          compilerNotes.push(`pronoun_resolved: ${c.target_reference}`);
+          continue;
+        }
+      }
       if (
         c.issue_type === 'ambiguous_identity' &&
         isFirstPersonPronoun(c.target_reference)

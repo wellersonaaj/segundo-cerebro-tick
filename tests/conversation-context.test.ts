@@ -6,6 +6,7 @@ import {
   shouldSkipAssigneeUncertaintyGap,
 } from '../src/services/implicit-assignee.service.js';
 import {
+  applyInTextPronounCoreference,
   applyThreadPronounCoreference,
   collectResolvedThreadPronouns,
   isThirdPersonObjectPronoun,
@@ -98,6 +99,45 @@ describe('thread pronoun coreference', () => {
     expect(prependThreadContextToEffectiveInput('[SOURCE_BLOCK:raw]\nOi', threadContext)).toContain(
       '[CONTEXTO_DA_CONVERSA]',
     );
+  });
+
+  it('in-text ele antecedent wins over stale thread salient when Breno precedes ele', () => {
+    const excerpt =
+      'Mandei mensagem para o Breno sugerindo que eu e o Brant almocemos com ele sábado ou domingo.';
+    const output: ExtractorOutputV14 = {
+      schema_version: '1.4',
+      events: [],
+      aliases: [],
+      assertions: [],
+      task_signals: [],
+      review_hints: [],
+      extraction_notes: [],
+      correction_signals: [],
+      clarification_candidates: [],
+      entity_mentions: [
+        { mention_text: 'Breno', suggested_entity_type: 'person', source_excerpt: excerpt, confidence: 0.98 },
+        { mention_text: 'ele', suggested_entity_type: 'person', source_excerpt: excerpt, confidence: 0.8 },
+      ],
+    };
+
+    const brenoRegistry = [
+      ...registry,
+      {
+        id: 'breno-id',
+        name: 'Breno Moreira',
+        normalized_name: 'breno moreira',
+        entity_type: 'person',
+        aliases: ['Breno'],
+      },
+    ];
+
+    const resolver = new ReferenceResolverService(brenoRegistry);
+    let result = resolver.resolveReferences(['Breno', 'ele']);
+    result = applyInTextPronounCoreference(result, output);
+    result = applyThreadPronounCoreference(result, 'conversational', threadContext);
+
+    expect(result.byReferenceText.get('ele')?.entity_id).toBe('breno-id');
+    expect(result.byReferenceText.get('ele')?.canonical_name).toContain('Breno');
   });
 
   it('resolves ela to salient thread person', () => {
