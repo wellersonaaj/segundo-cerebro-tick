@@ -54,9 +54,11 @@ export function isReferenceCentralToTaskSignals(
     if (task.target_reference && normalizeText(task.target_reference) === refNorm) {
       return true;
     }
-    const titleNorm = normalizeText(task.title);
-    if (titleNorm.includes(refNorm)) {
-      return true;
+    if (task.title) {
+      const titleNorm = normalizeText(task.title);
+      if (titleNorm.includes(refNorm)) {
+        return true;
+      }
     }
   }
   return false;

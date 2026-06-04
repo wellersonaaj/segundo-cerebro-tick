@@ -69,6 +69,28 @@ export class InboxItemsRepository {
     return (data ?? []) as InboxItemRow[];
   }
 
+  async updateMetadata(id: string, metadata: Record<string, unknown>): Promise<void> {
+    const { error } = await this.db.from('inbox_items').update({ metadata }).eq('id', id);
+    if (error) throw new Error(`inbox_items.updateMetadata: ${error.message}`);
+  }
+
+  async listTelegramByChatId(chatId: number, limit = 50): Promise<InboxItemRow[]> {
+    const { data, error } = await this.db
+      .from('inbox_items')
+      .select()
+      .eq('source_channel', 'telegram')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) throw new Error(`inbox_items.listTelegramByChatId: ${error.message}`);
+
+    return (data ?? []).filter((row) => {
+      const meta = row.metadata as Record<string, unknown> | null | undefined;
+      const telegram = meta?.telegram;
+      if (!telegram || typeof telegram !== 'object') return false;
+      return (telegram as { chat_id?: unknown }).chat_id === chatId;
+    }) as InboxItemRow[];
+  }
+
   async updateStatus(
     id: string,
     status: ProcessingStatus,

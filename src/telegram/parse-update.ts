@@ -16,6 +16,11 @@ const telegramMessageSchema = z.object({
   }),
   date: z.number().int(),
   text: z.string().optional(),
+  reply_to_message: z
+    .object({
+      message_id: z.number().int(),
+    })
+    .optional(),
 });
 
 const telegramUpdateSchema = z.object({
@@ -28,8 +33,10 @@ const telegramUpdateSchema = z.object({
 const n8nForwardSchema = z.object({
   text: z.string().min(1),
   user_id: z.coerce.number().int().positive(),
+  chat_id: z.coerce.number().int().positive().optional(),
   message_id: z.coerce.number().int().positive().optional(),
   date: z.coerce.number().int().positive().optional(),
+  reply_to_message_id: z.coerce.number().int().positive().optional(),
 });
 
 export interface ParsedTelegramCapture {
@@ -38,6 +45,7 @@ export interface ParsedTelegramCapture {
   messageId: number;
   text: string;
   receivedAt: string;
+  replyToMessageId?: number;
 }
 
 export type ParseTelegramUpdateResult =
@@ -63,6 +71,7 @@ function fromMessage(message: z.infer<typeof telegramMessageSchema>): ParseTeleg
       messageId: message.message_id,
       text,
       receivedAt: unixToIso(message.date),
+      replyToMessageId: message.reply_to_message?.message_id,
     },
   };
 }
@@ -75,10 +84,11 @@ export function parseTelegramWebhookBody(body: unknown): ParseTelegramUpdateResu
       kind: 'capture',
       capture: {
         userId: n8n.data.user_id,
-        chatId: n8n.data.user_id,
+        chatId: n8n.data.chat_id ?? n8n.data.user_id,
         messageId: n8n.data.message_id ?? 0,
         text: n8n.data.text.trim(),
         receivedAt: unixToIso(dateUnix),
+        replyToMessageId: n8n.data.reply_to_message_id,
       },
     };
   }

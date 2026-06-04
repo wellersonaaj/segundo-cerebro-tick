@@ -251,7 +251,7 @@ export class MemoryCompilerV2Service {
       const fact =
         getBestFactForReference(enrichment.facts, event.title) ??
         enrichment.facts.find((f) => f.field === 'occurred_at');
-      if (!fact) continue;
+      if (!fact || fact.field === 'entity_disambiguation') continue;
 
       if (
         fact.field === 'occurred_at' &&
@@ -261,20 +261,49 @@ export class MemoryCompilerV2Service {
       ) {
         event.occurredAt = fact.occurredAtIso;
         notes.push(`external_enrichment_applied: ${fact.matchedReference}`);
-      } else if (fact.confidence >= suggestConfidence) {
-        notes.push(`external_enrichment_suggested: ${fact.matchedReference}`);
+      }
+    }
+
+    for (const fact of enrichment.facts) {
+      if (fact.confidence < suggestConfidence) continue;
+      if (fact.field === 'occurred_at') {
         const existing = clarifications.find(
           (c) => normalizeText(c.targetReference) === normalizeText(fact.matchedReference),
         );
+        if (!existing) continue;
         const suggestion = fact.occurredAtIso
           ? `${fact.occurredAtIso.replace('/', ' a ')} (fonte: ${fact.sourceUrl ?? fact.sourceLabel})`
           : `${fact.claim} (fonte: ${fact.sourceUrl ?? fact.sourceLabel})`;
-        if (existing) {
-          if (!existing.suggestedAnswers.includes(suggestion)) {
-            existing.suggestedAnswers = [...existing.suggestedAnswers, suggestion];
-          }
-        }
+        this.appendEnrichmentSuggestion(existing, suggestion, fact.matchedReference, notes);
+        continue;
       }
+      if (fact.field === 'entity_disambiguation' || fact.field === 'description') {
+        const existing = clarifications.find(
+          (c) => normalizeText(c.targetReference) === normalizeText(fact.matchedReference),
+        );
+        if (!existing) continue;
+        const suggestion = `${fact.claim} (fonte: ${fact.sourceUrl ?? fact.sourceLabel})`;
+        this.appendEnrichmentSuggestion(
+          existing,
+          suggestion,
+          fact.matchedReference,
+          notes,
+          'external_enrichment_suggested_clarification',
+        );
+      }
+    }
+  }
+
+  private appendEnrichmentSuggestion(
+    clarification: CompiledClarificationCandidateV2,
+    suggestion: string,
+    matchedReference: string,
+    notes: string[],
+    notePrefix = 'external_enrichment_suggested',
+  ): void {
+    if (!clarification.suggestedAnswers.includes(suggestion)) {
+      clarification.suggestedAnswers = [...clarification.suggestedAnswers, suggestion];
+      notes.push(`${notePrefix}: ${matchedReference}`);
     }
   }
 

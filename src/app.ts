@@ -95,6 +95,8 @@ export async function buildApp(deps: AppDeps = {}) {
       processor,
       new InboxItemsRepository(db),
       inboxItemProcess,
+      new ClarificationsRepository(db),
+      clarifications,
     ),
   });
 

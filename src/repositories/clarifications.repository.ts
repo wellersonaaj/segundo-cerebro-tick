@@ -69,6 +69,38 @@ export class ClarificationsRepository {
     return counts;
   }
 
+  async listPending(limit = 50): Promise<ClarificationRequest[]> {
+    return this.list('pending', limit);
+  }
+
+  async listPendingByInboxItem(inboxItemId: string): Promise<ClarificationRequest[]> {
+    const { data, error } = await this.db
+      .from('clarification_requests')
+      .select()
+      .eq('inbox_item_id', inboxItemId)
+      .eq('record_status', 'active')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: true });
+    if (error) throw new Error(`clarifications.listPendingByInboxItem: ${error.message}`);
+    return (data ?? []) as ClarificationRequest[];
+  }
+
+  async listPendingForTelegramChat(
+    chatId: number,
+    inboxItemIds: string[],
+  ): Promise<ClarificationRequest[]> {
+    if (!inboxItemIds.length) return [];
+    const { data, error } = await this.db
+      .from('clarification_requests')
+      .select()
+      .in('inbox_item_id', inboxItemIds)
+      .eq('record_status', 'active')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: true });
+    if (error) throw new Error(`clarifications.listPendingForTelegramChat: ${error.message}`);
+    return (data ?? []) as ClarificationRequest[];
+  }
+
   async list(status?: ClarificationStatus, limit = 50): Promise<ClarificationRequest[]> {
     let q = this.db
       .from('clarification_requests')

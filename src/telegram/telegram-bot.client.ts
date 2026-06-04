@@ -39,10 +39,11 @@ export async function sendTelegramMessage(
   config: TelegramConfig,
   chatId: number,
   text: string,
-): Promise<void> {
-  await callTelegramApi(config, 'sendMessage', {
+): Promise<number> {
+  const data = await callTelegramApi<{ message_id: number }>(config, 'sendMessage', {
     chat_id: chatId,
     text,
     disable_web_page_preview: true,
   });
+  return data.result!.message_id;
 }

@@ -4,7 +4,8 @@ export const EXTERNAL_KNOWLEDGE_ENRICHMENT_VERSION = '1.0.0';
 export type EnrichmentGapKind =
   | 'missing_event_date'
   | 'non_registry_named_reference'
-  | 'clarification_external';
+  | 'clarification_external'
+  | 'ambiguous_entity_central';
 
 export interface EnrichmentTrigger {
   targetReference: string;
@@ -25,7 +26,7 @@ export interface EnrichedFact {
   sourceLabel: string;
   confidence: number;
   matchedReference: string;
-  field?: 'occurred_at' | 'title' | 'description';
+  field?: 'occurred_at' | 'title' | 'description' | 'entity_disambiguation';
   occurredAtIso?: string | null;
 }
 

@@ -65,8 +65,16 @@ export async function registerTelegramWebhookRoutes(
     });
 
     try {
-      const result = await deps.telegramInbox.ingestAndNotify(capture);
-      return reply.status(201).send({ ok: true, ...result });
+      const handled = await deps.telegramInbox.ingestAndNotify(capture);
+      if (handled.kind === 'clarification_resolved') {
+        return reply.send({
+          ok: true,
+          clarification_resolved: true,
+          inbox_item_id: handled.inbox_item_id,
+          answer: handled.answer,
+        });
+      }
+      return reply.status(201).send({ ok: true, ...handled.result });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       log('error', 'telegram_webhook', { step: 'capture_failed', error: message });

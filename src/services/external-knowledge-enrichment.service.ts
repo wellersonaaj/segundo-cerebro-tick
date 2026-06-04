@@ -73,7 +73,7 @@ function extractDateRangeFromText(text: string, year: number): string | null {
 function nameMatchScore(reference: string, snippet: WebSearchSnippet): number {
   const refNorm = normalizeText(reference).replace(/\s/g, '');
   const blobNorm = normalizeText(`${snippet.title} ${snippet.content}`).replace(/\s/g, '');
-  if (refNorm.length >= 4 && blobNorm.includes(refNorm)) return 1;
+  if (refNorm.length >= 3 && blobNorm.includes(refNorm)) return 1;
   const refTokens = normalizeText(reference).split(/\s+/).filter(Boolean);
   const blob = normalizeText(`${snippet.title} ${snippet.content}`);
   let hits = 0;
@@ -91,8 +91,11 @@ function synthesizeFacts(
 ): EnrichedFact[] {
   const facts: EnrichedFact[] = [];
   for (const sn of snippets) {
-    const match = nameMatchScore(trigger.targetReference, sn);
-    if (match < 0.4) continue;
+    const match =
+      trigger.gapKind === 'ambiguous_entity_central'
+        ? 0.85
+        : nameMatchScore(trigger.targetReference, sn);
+    if (trigger.gapKind !== 'ambiguous_entity_central' && match < 0.4) continue;
     const dateRange = extractDateRangeFromText(sn.content, trigger.anchorYear);
     let confidence = 0.5 + match * 0.3;
     if (sn.url.includes('websummit') || sn.url.includes('rio.websummit')) {
@@ -101,7 +104,7 @@ function synthesizeFacts(
     if (dateRange) confidence += 0.1;
     confidence = Math.min(confidence, 0.98);
 
-    if (dateRange && confidence >= suggestConfidence) {
+    if (dateRange && confidence >= suggestConfidence && trigger.gapKind !== 'ambiguous_entity_central') {
       facts.push({
         claim: `Evento ${trigger.targetReference} em ${dateRange.replace('/', ' a ')}`,
         sourceUrl: sn.url,
@@ -110,6 +113,16 @@ function synthesizeFacts(
         matchedReference: trigger.targetReference,
         field: 'occurred_at',
         occurredAtIso: dateRange,
+      });
+    } else if (trigger.gapKind === 'ambiguous_entity_central' && confidence >= suggestConfidence) {
+      const claim = `${sn.title}: ${sn.content.slice(0, 120).trim()}`.slice(0, 200);
+      facts.push({
+        claim,
+        sourceUrl: sn.url,
+        sourceLabel: sn.title,
+        confidence,
+        matchedReference: trigger.targetReference,
+        field: 'entity_disambiguation',
       });
     } else if (confidence >= suggestConfidence) {
       facts.push({

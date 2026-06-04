@@ -612,6 +612,89 @@ describe('MemoryCompilerV2Service', () => {
     expect(esxKc.length).toBe(1);
   });
 
+  it('appends web enrichment suggestions to ESX clarification', () => {
+    const output = parseExtractorOutputV14({
+      schema_version: '1.4',
+      events: [],
+      aliases: [],
+      assertions: [],
+      task_signals: [
+        {
+          title: 'Descobrir se ir ao ESX será bom para a Velt',
+          due_at: null,
+          operation: 'create',
+          task_kind: 'follow_up',
+          confidence: 0.9,
+          status_signal: 'open',
+          blocked_reason: null,
+          source_excerpt: 'Preciso descobrir se ir ao ESX vai ser bom para nós da Velt',
+          task_reference: null,
+          target_reference: 'ESX',
+          project_reference: null,
+          assignee_reference: null,
+          source_block_reference: '[SOURCE_BLOCK:raw]',
+        },
+      ],
+      review_hints: [],
+      extraction_notes: [],
+      correction_signals: [],
+      entity_mentions: [
+        {
+          mention_text: 'ESX',
+          suggested_entity_type: 'other',
+          source_excerpt: 'ir ao ESX',
+          confidence: 0.9,
+        },
+      ],
+      clarification_candidates: [
+        {
+          target_type: 'entity',
+          target_reference: 'ESX',
+          issue_type: 'ambiguous_entity_type',
+          question: 'O que é ESX?',
+          reason: 'tipo não resolvido',
+          priority: 'medium',
+          blocking_scope: 'knowledge_confirmation',
+          suggested_answers: ['conferência'],
+          source_excerpt: 'ir ao ESX',
+          source_block_reference: '[SOURCE_BLOCK:raw]',
+          confidence: 0.75,
+        },
+      ],
+    });
+    const resolver = new ReferenceResolverService(registry.entities);
+    const resolverResult = resolver.resolveReferences(collectReferenceTextsFromExtractor(output));
+    const compiled = new MemoryCompilerV2Service().compile({
+      extractorOutput: output,
+      effectiveInput: '[SOURCE_BLOCK:raw]\nPreciso descobrir se ir ao ESX vai ser bom para nós da Velt',
+      resolverResult,
+      externalEnrichment: {
+        enrichmentId: 'external-knowledge-enrichment',
+        enrichmentVersion: '1.0.0',
+        status: 'resolved',
+        reasonCode: 'facts_found',
+        queries: [],
+        facts: [
+          {
+            claim: 'E3: gaming industry trade event',
+            sourceUrl: 'https://en.wikipedia.org/wiki/E3',
+            sourceLabel: 'E3 - Wikipedia',
+            confidence: 0.85,
+            matchedReference: 'ESX',
+            field: 'entity_disambiguation',
+          },
+        ],
+      },
+      enrichmentSuggestConfidence: 0.6,
+    });
+
+    const esx = compiled.clarificationCandidates.find((c) => c.targetReference === 'ESX');
+    expect(esx?.suggestedAnswers.some((a) => a.includes('wikipedia.org'))).toBe(true);
+    expect(compiled.compilerNotes.some((n) => n.includes('external_enrichment_suggested_clarification: ESX'))).toBe(
+      true,
+    );
+  });
+
   it('S3.1: termos genéricos/metalinguísticos não entram em resolvedEntities', () => {
     const blocked = [
       'cliente',

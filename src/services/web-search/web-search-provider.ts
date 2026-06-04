@@ -30,3 +30,19 @@ export function websummitRioMockSnippets(): WebSearchSnippet[] {
     },
   ];
 }
+
+export function esxMockSnippets(): WebSearchSnippet[] {
+  return [
+    {
+      title: 'E3 - Wikipedia',
+      url: 'https://en.wikipedia.org/wiki/E3',
+      content:
+        'E3 was a trade event for the video game industry organized by the Entertainment Software Association.',
+    },
+    {
+      title: 'Electronic Entertainment Expo',
+      url: 'https://www.e3expo.com',
+      content: 'E3 is the Electronic Entertainment Expo, a major gaming industry conference.',
+    },
+  ];
+}

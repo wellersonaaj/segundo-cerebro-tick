@@ -1,5 +1,8 @@
 import type { ExtractorOutputV14 } from '../openai/extractor-v1.4.types.js';
-import { isMvpAutoRegistryEntityType } from '../config/mvp-registry-policy.js';
+import {
+  isMvpAutoRegistryEntityType,
+  isReferenceCentralToTaskSignals,
+} from '../config/mvp-registry-policy.js';
 import { normalizeText } from '../utils/normalize.js';
 import type { EnrichmentTrigger } from '../types/external-knowledge-enrichment.js';
 
@@ -85,6 +88,18 @@ export function scanEnrichmentTriggers(
 
   for (const c of output.clarification_candidates) {
     if (
+      c.issue_type === 'ambiguous_entity_type' &&
+      c.blocking_scope === 'knowledge_confirmation' &&
+      isProperNounLike(c.target_reference) &&
+      isReferenceCentralToTaskSignals(c.target_reference, output.task_signals)
+    ) {
+      add({
+        targetReference: c.target_reference,
+        gapKind: 'ambiguous_entity_central',
+        sourceExcerpt: c.source_excerpt,
+        anchorYear,
+      });
+    } else if (
       (c.issue_type === 'ambiguous_date' ||
         c.issue_type === 'unclear_scope' ||
         c.issue_type === 'other') &&
@@ -106,6 +121,9 @@ export function scanEnrichmentTriggers(
 export function buildSearchQueries(trigger: EnrichmentTrigger): string[] {
   const name = trigger.targetReference.trim();
   const year = trigger.anchorYear;
+  if (trigger.gapKind === 'ambiguous_entity_central') {
+    return [`${name} conference event ${year}`, `${name} what is`];
+  }
   if (trigger.gapKind === 'missing_event_date' || trigger.gapKind === 'clarification_external') {
     return [`${name} ${year} dates`, `${name} ${year} official`];
   }
