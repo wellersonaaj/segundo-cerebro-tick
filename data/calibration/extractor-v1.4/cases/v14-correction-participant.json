@@ -1,0 +1,8 @@
+{
+  "scenario_id": "v14-correction-participant",
+  "category": "correction_participant",
+  "fixture_origin": "synthetic",
+  "source_channel": "calibration",
+  "source_mode": "conversational",
+  "raw_content": "[SOURCE_BLOCK:raw]\nChris participou da reunião 2.\n\n[SOURCE_BLOCK:correction:00000000-0000-4000-8000-000000000002]\n[CORREÇÃO] Na verdade, Bruno Vega participou da reunião."
+}

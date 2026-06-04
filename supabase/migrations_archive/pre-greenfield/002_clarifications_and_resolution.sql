@@ -49,6 +49,7 @@ create table if not exists clarification_requests (
     issue_type in (
       'ambiguous_entity_type',
       'ambiguous_entity_identity',
+      'ambiguous_alias_conflict',
       'missing_task_target',
       'missing_external_action_target',
       'missing_date',

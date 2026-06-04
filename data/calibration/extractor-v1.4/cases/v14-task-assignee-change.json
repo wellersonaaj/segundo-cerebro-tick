@@ -1,0 +1,8 @@
+{
+  "scenario_id": "v14-task-assignee-change",
+  "category": "task_assignee_change",
+  "fixture_origin": "synthetic",
+  "source_channel": "calibration",
+  "source_mode": "conversational",
+  "raw_content": "[SOURCE_BLOCK:raw]\nTarefa de migração passou para Dana Silva."
+}

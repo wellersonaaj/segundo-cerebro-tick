@@ -13,7 +13,7 @@ export async function getEntityDetails(
   if (!details) return { error: 'Entity not found' };
   return {
     entity: details.entity,
-    aliases: details.aliases.map((a) => a.alias),
+    aliases: details.aliases,
     recent_events: details.events,
     open_tasks: details.open_tasks,
   };

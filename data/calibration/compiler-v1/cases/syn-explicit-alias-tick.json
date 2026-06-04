@@ -1,0 +1,57 @@
+{
+  "scenario_id": "syn-explicit-alias-tick",
+  "category": "explicit_alias",
+  "fixture_origin": "synthetic",
+  "raw_content": "Ace é alias de Alex Costa.",
+  "extractor_output": {
+    "schema_version": "1.3",
+    "inbox_item_id": "00000000-0000-4000-8000-000000000009",
+    "events": [],
+    "entities": [
+      {
+        "name": "Ace",
+        "entity_type": "person",
+        "source_excerpt": "Ace",
+        "confidence": 0.9,
+        "aliases": []
+      },
+      {
+        "name": "Alex Costa",
+        "entity_type": "person",
+        "source_excerpt": "Alex Costa",
+        "confidence": 0.9,
+        "aliases": [
+          "Ace"
+        ]
+      }
+    ],
+    "assertions": [],
+    "tasks": [],
+    "clarification_requests": [],
+    "requires_review": false,
+    "review_reasons": [],
+    "processing_notes": []
+  },
+  "expected": {
+    "must_have": {
+      "entities": [
+        "Alex Costa"
+      ]
+    },
+    "must_not_have": {
+      "entities": [
+        "Ace"
+      ]
+    },
+    "allowed": {
+      "entities": [
+        "Alex Costa"
+      ]
+    }
+  },
+  "source_mode": "conversational",
+  "received_at": "2026-06-01T12:00:00-03:00",
+  "timezone": "America/Sao_Paulo",
+  "extractor_version": "extractor-v1.3",
+  "captured_at": "2026-06-02T12:00:00Z"
+}

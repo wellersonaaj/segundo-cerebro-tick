@@ -1,0 +1,18 @@
+{
+  "extractor_version": "extractor-v1.4",
+  "schema_version": "1.4",
+  "prompt_version": "extractor-v1.4",
+  "compiler_version": "memory-compiler-v2",
+  "status": "extractor_block1_only",
+  "case_count": 13,
+  "thresholds_future": {
+    "alias_target_recall": 0.95,
+    "entity_precision": 0.95,
+    "event_kind_match": 0.9,
+    "negation_error_rate": 0,
+    "alias_as_entity_rate": 0,
+    "preference_to_event_rate": 0,
+    "description_corruption_rate": 0,
+    "false_clarification_rate": 0.05
+  }
+}

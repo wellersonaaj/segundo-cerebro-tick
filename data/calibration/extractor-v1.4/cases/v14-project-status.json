@@ -1,0 +1,8 @@
+{
+  "scenario_id": "v14-project-status",
+  "category": "project_status_update",
+  "fixture_origin": "synthetic",
+  "source_channel": "calibration",
+  "source_mode": "conversational",
+  "raw_content": "[SOURCE_BLOCK:raw]\nO Projeto Atlas entrou em fase de homologação esta semana."
+}

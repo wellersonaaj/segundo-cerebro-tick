@@ -23,7 +23,7 @@ export function createMockExtractor(scenarioId?: string): ExtractFn {
     }
 
     return {
-      schema_version: '1.2',
+      schema_version: '1.3',
       inbox_item_id: params.inbox_item_id,
       events: [],
       entities: [],

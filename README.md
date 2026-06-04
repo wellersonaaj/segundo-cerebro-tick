@@ -30,6 +30,18 @@ Ver `.env.example`:
 | `OPENAI_API_KEY` | Chave OpenAI |
 | `OPENAI_MODEL` | Modelo (padrão: `gpt-5-mini`) |
 | `RUN_OPENAI_INTEGRATION_TESTS` | `true` para testes com API real |
+| `TELEGRAM_BOT_TOKEN` | Token do BotFather (interface Telegram) |
+| `TELEGRAM_ALLOWED_USER_ID` | ID numérico do usuário autorizado a capturar |
+| `TELEGRAM_WEBHOOK_SECRET` | `secret_token` do webhook (header `X-Telegram-Bot-Api-Secret-Token`) |
+| `TELEGRAM_WEBHOOK_URL` | URL pública registrada no Telegram (ex.: webhook do n8n) |
+| `TELEGRAM_DEFAULT_TIMEZONE` | Fuso nas capturas via Telegram (padrão: `America/Sao_Paulo`) |
+
+### Telegram (n8n → API)
+
+1. Preencha as variáveis `TELEGRAM_*` no `.env`.
+2. `npm run telegram:set-webhook` — registra no Telegram a URL do n8n com o secret.
+3. No n8n, após o trigger Telegram, faça HTTP POST para `http://<sua-api>/webhooks/telegram` com header `X-Telegram-Bot-Api-Secret-Token: <TELEGRAM_WEBHOOK_SECRET>` e corpo igual ao update do Telegram (ou `{ "text": "...", "user_id": 5991664193 }`).
+4. A API processa como `source_channel=telegram` e responde no chat com um resumo da captura.
 
 ## Migrations
 
@@ -52,7 +64,10 @@ Execute após **004** quando o Supabase foi criado com constraints/colunas antig
 | 6 | `006_allow_events_occurred_at_null.sql` | `events.occurred_at` nullable (evento sem data no texto) |
 | 7 | `007_align_inbox_processing_status.sql` | CHECK `processing_status` → contrato MVP (`completed`; legado costuma usar `processed`) |
 
-Ordem recomendada em banco pré-existente: **004 → 005 → 006 → 007**.
+Ordem recomendada em banco pré-existente: **004 → 005 → 006 → 007 → 008 → 009**.
+
+| 8 | `008_entity_lifecycle_and_inbox_processed_at.sql` | `processed_at`, `event_entities.relation_type`, `ambiguous_alias_conflict` |
+| 9 | `009_align_event_entities_relation_type.sql` | `event_entities.relation_type NOT NULL DEFAULT 'mentioned'` |
 
 A **007** falha com mensagem explícita se existirem linhas com `processed`, `needs_review`, `ignored` etc. — corrija manualmente antes de reaplicar (sem conversão automática).
 
@@ -149,6 +164,16 @@ Notas:
 - Exige `ALLOW_BOOTSTRAP_IMPORT=true` como proteção contra importação acidental.
 - Limite padrão de 50.000 caracteres (`BOOTSTRAP_MAX_CHARS` sobrescrevível no `.env`).
 - O arquivo pessoal `data/bootstrap/memoria-inicial.md` **não deve ser commitado** (está no `.gitignore`); use `memoria-inicial.example.md` como template versionado.
+
+Requer migrations **008**, **009** e **010** aplicadas no Supabase, reset e reimportação após atualizar o código:
+
+```bash
+ALLOW_TEST_DATA_RESET=true npm run reset:test-data
+ALLOW_BOOTSTRAP_IMPORT=true npm run import:bootstrap -- data/bootstrap/01-identidade-e-pessoas.md
+npm run test:bootstrap:smoke
+```
+
+O smoke valida 16 entidades, 11 aliases, evento principal (`profile_created` ou `document_snapshot`) com 16 `event_entities`, hidratação REST/MCP de aliases, e ausência de aliases como entidades separadas.
 
 ### Exemplo: capturar nota
 

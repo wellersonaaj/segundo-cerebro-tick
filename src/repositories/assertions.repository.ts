@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { buildIlikeOrFilter } from '../db/postgrest-filter-utils.js';
 import type { Assertion, ExtractedAssertion } from '../types/domain.js';
 
 export class AssertionsRepository {
@@ -9,20 +10,31 @@ export class AssertionsRepository {
     extracted: ExtractedAssertion,
     correctionId?: string,
   ): Promise<Assertion> {
+    return this.createCandidate(inboxItemId, null, extracted, correctionId);
+  }
+
+  async createCandidate(
+    inboxItemId: string,
+    extractionRunId: string | null,
+    extracted: ExtractedAssertion,
+    correctionId?: string,
+  ): Promise<Assertion> {
     const { data, error } = await this.db
       .from('assertions')
       .insert({
         inbox_item_id: inboxItemId,
+        extraction_run_id: extractionRunId,
         assertion_type: extracted.assertion_type,
         content: extracted.content,
         status: extracted.status,
         source_excerpt: extracted.source_excerpt,
         confidence: extracted.confidence,
         correction_id: correctionId ?? null,
+        record_status: 'candidate',
       })
       .select()
       .single();
-    if (error) throw new Error(`assertions.create: ${error.message}`);
+    if (error) throw new Error(`assertions.createCandidate: ${error.message}`);
     return data as Assertion;
   }
 
@@ -31,7 +43,12 @@ export class AssertionsRepository {
       .from('assertions')
       .select()
       .eq('record_status', 'active')
-      .or(`content.ilike.%${query}%,source_excerpt.ilike.%${query}%`)
+      .or(
+        buildIlikeOrFilter(
+          ['subject_reference', 'predicate', 'value_text', 'source_excerpt'],
+          query,
+        ),
+      )
       .order('created_at', { ascending: false })
       .limit(limit);
     if (error) throw new Error(`assertions.searchText: ${error.message}`);

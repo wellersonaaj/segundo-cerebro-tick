@@ -7,11 +7,11 @@ import type {
 import { normalizeText } from '../utils/normalize.js';
 import type { ResolvedEntityMap } from './memory-resolver.service.js';
 
-const FORBIDDEN_SECONDARY_INFO =
+export const FORBIDDEN_SECONDARY_INFO =
   /\b(telefone|e-?mail|email|contato|respons[aá]vel|n[uú]mero do contrato|prazo adicional)\b/i;
 
 const ENTITY_TYPE_AMBIGUITY_IN_TEXT =
-  /\b(tipo|identidade)\b.*amb[ií]guo?|\bamb[ií]guo?\b.*\b(tipo|genius)\b|genius.*amb[ií]guo?|tipo.*genius.*amb[ií]guo?/i;
+  /\b(tipo|identidade)\b.*amb[ií]gu|\bamb[ií]gu.*\b(tipo|genius)\b|genius.*amb[ií]gu|tipo.*genius.*amb[ií]gu/i;
 
 const MIN_FORNECEDOR_QUESTION = 'Qual fornecedor deve ser cobrado?';
 

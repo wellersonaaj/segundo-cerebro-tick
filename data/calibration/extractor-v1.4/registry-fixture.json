@@ -1,0 +1,74 @@
+{
+  "entities": [
+    {
+      "id": "e1",
+      "name": "Alex Costa",
+      "normalized_name": "alex costa",
+      "entity_type": "person",
+      "aliases": ["ace", "tick"]
+    },
+    {
+      "id": "e2",
+      "name": "Dana Silva",
+      "normalized_name": "dana silva",
+      "entity_type": "person",
+      "aliases": ["dee", "lari"]
+    },
+    {
+      "id": "e3",
+      "name": "Chris Oliveira",
+      "normalized_name": "chris oliveira",
+      "entity_type": "person",
+      "aliases": ["cri", "tchelo", "chris"]
+    },
+    {
+      "id": "e4",
+      "name": "Bruno Vega",
+      "normalized_name": "bruno vega",
+      "entity_type": "person",
+      "aliases": []
+    },
+    {
+      "id": "e5",
+      "name": "Gabriel Nova",
+      "normalized_name": "gabriel nova",
+      "entity_type": "person",
+      "aliases": []
+    },
+    {
+      "id": "e6",
+      "name": "Helcio Zeta",
+      "normalized_name": "helcio zeta",
+      "entity_type": "person",
+      "aliases": ["zeta"]
+    },
+    {
+      "id": "e7",
+      "name": "Pat Lee",
+      "normalized_name": "pat lee",
+      "entity_type": "person",
+      "aliases": ["fox"]
+    },
+    {
+      "id": "e8",
+      "name": "Sam Fox",
+      "normalized_name": "sam fox",
+      "entity_type": "person",
+      "aliases": []
+    },
+    {
+      "id": "e9",
+      "name": "Chris Mendes",
+      "normalized_name": "chris mendes",
+      "entity_type": "person",
+      "aliases": []
+    },
+    {
+      "id": "e10",
+      "name": "Projeto Atlas",
+      "normalized_name": "projeto atlas",
+      "entity_type": "project",
+      "aliases": ["atlas"]
+    }
+  ]
+}

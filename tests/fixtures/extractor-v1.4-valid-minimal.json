@@ -1,0 +1,87 @@
+{
+  "schema_version": "1.4",
+  "entity_mentions": [
+    {
+      "mention_text": "Alex Costa",
+      "suggested_entity_type": "person",
+      "source_excerpt": "Alex Costa",
+      "confidence": 0.95
+    }
+  ],
+  "aliases": [
+    {
+      "alias": "Ace",
+      "target_reference": "Alex Costa",
+      "negated_former_references": [],
+      "source_excerpt": "Alex Costa (Ace)",
+      "confidence": 0.9
+    }
+  ],
+  "events": [
+    {
+      "event_kind": "meeting",
+      "title": "Reunião de integração",
+      "source_excerpt": "Chris participou da reunião",
+      "occurred_at": null,
+      "episodic_confidence": 0.85,
+      "related_entities": [
+        {
+          "entity_reference": "Chris Oliveira",
+          "relation_type": "participant",
+          "role": null
+        }
+      ]
+    }
+  ],
+  "correction_signals": [
+    {
+      "correction_type": "replace_subject",
+      "previous_reference": "Chris Oliveira",
+      "current_reference": "Bruno Vega",
+      "source_excerpt": "Na verdade, Bruno Vega participou",
+      "source_block_reference": "[SOURCE_BLOCK:correction:00000000-0000-4000-8000-000000000001]",
+      "confidence": 0.92
+    }
+  ],
+  "assertions": [
+    {
+      "assertion_kind": "opinion",
+      "subject_reference": "Alex Costa",
+      "predicate": "prefere",
+      "object_reference": null,
+      "value_text": "reuniões pela manhã",
+      "related_entity_references": ["Alex Costa"],
+      "source_excerpt": "Alex prefere reuniões pela manhã",
+      "source_block_reference": "[SOURCE_BLOCK:raw]",
+      "confidence": 0.88
+    }
+  ],
+  "task_signals": [
+    {
+      "operation": "update_blocker",
+      "task_reference": "Enviar relatório",
+      "title": "Enviar relatório",
+      "task_kind": "delivery",
+      "status_signal": "blocked",
+      "assignee_reference": "Dana Silva",
+      "target_reference": "relatório Q2",
+      "project_reference": "Projeto Atlas",
+      "due_at": null,
+      "blocked_reason": "aguardando aprovação",
+      "source_excerpt": "Dana deve enviar o relatório Q2",
+      "source_block_reference": null,
+      "confidence": 0.9
+    }
+  ],
+  "clarification_candidates": [],
+  "review_hints": [
+    {
+      "issue_type": "ambiguous_entity_type",
+      "target_reference": "Projeto Atlas",
+      "reason": "tipo entre project e topic",
+      "source_excerpt": "Projeto Atlas",
+      "confidence": 0.6
+    }
+  ],
+  "extraction_notes": []
+}

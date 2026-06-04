@@ -30,6 +30,7 @@ describe('filterReviewReasonsAfterResolution', () => {
       [
         "Tipo da entidade 'Genius' ambíguo entre empresa/produto/projeto",
         "Tipo da entidade 'Genius' é ambíguo e pode afetar recuperação futura.",
+        "Ambiguidade no tipo da entidade 'Genius' que afeta como será armazenada e consultada.",
       ],
       [geniusResolution],
     );

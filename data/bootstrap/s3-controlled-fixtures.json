@@ -1,0 +1,71 @@
+{
+  "schema_version": "s3-controlled-v1",
+  "description": "Bootstrap controlado S3 — entradas pequenas e auditáveis para homologação.",
+  "defaults": {
+    "source_channel": "controlled-bootstrap-s3",
+    "source_mode": "conversational",
+    "received_at": "2026-05-31T10:00:00-03:00",
+    "timezone": "America/Sao_Paulo"
+  },
+  "entries": [
+    {
+      "id": "s3-01-identity",
+      "label": "identidade básica do usuário",
+      "raw_content": "Sou Wellerson Assumpção. Trabalho na VELT liderando o projeto Segundo Cérebro."
+    },
+    {
+      "id": "s3-02-person-bruno",
+      "label": "pessoa principal Bruno Brant",
+      "raw_content": "Bruno Brant Gotschalg é o responsável técnico principal na VELT."
+    },
+    {
+      "id": "s3-03-company-velt",
+      "label": "empresa VELT",
+      "raw_content": "A VELT é a empresa onde atuo em produto e engenharia."
+    },
+    {
+      "id": "s3-04-project-sc",
+      "label": "projeto Segundo Cérebro",
+      "raw_content": "O projeto Segundo Cérebro está em fase MVP de ingestão greenfield."
+    },
+    {
+      "id": "s3-05-product-genius",
+      "label": "produto Genius Hotels",
+      "raw_content": "O produto Genius Hotels é a integração principal com parceiros de hotelaria."
+    },
+    {
+      "id": "s3-06-decision",
+      "label": "decisão",
+      "raw_content": "Decidimos adotar registry automático restrito a person, company, project e product no MVP."
+    },
+    {
+      "id": "s3-07-hypothesis",
+      "label": "hipótese",
+      "raw_content": "Acho que a liberação da API do Genius pode atrasar por dependência externa."
+    },
+    {
+      "id": "s3-08-task-defined-target",
+      "label": "tarefa com target definido",
+      "raw_content": "Preciso enviar o relatório semanal para Bruno Brant até sexta-feira."
+    },
+    {
+      "id": "s3-09-task-generic-target",
+      "label": "tarefa com target genérico",
+      "raw_content": "Preciso cobrar o fornecedor amanhã."
+    },
+    {
+      "id": "s3-10-correction-original",
+      "label": "correção simples — entrada original",
+      "raw_content": "Marcelo Oliveira participou da call sobre integração com o Genius.",
+      "correction": {
+        "text": "Na verdade, Bruno Brant participou da call."
+      }
+    }
+  ],
+  "probes": {
+    "external_action_unsafe": {
+      "label": "external_action insegura (não promove)",
+      "raw_content": "Envie o contrato para o cliente amanhã."
+    }
+  }
+}

@@ -25,16 +25,28 @@ import {
   searchRecentMentions,
   searchRecentMentionsInputSchema,
 } from './tools/search-recent-mentions.tool.js';
+import { ExtractionRunsRepository } from '../repositories/extraction-runs.repository.js';
+import { InboxItemEntitiesRepository } from '../repositories/inbox-item-entities.repository.js';
+import {
+  listInboxExtractionRuns,
+  listInboxExtractionRunsInputSchema,
+  listInboxItemEntities,
+  listInboxItemEntitiesInputSchema,
+} from './tools/list-extraction-runs.tool.js';
 
 async function main() {
   loadEnv();
   const db = getSupabase();
+  const runsRepo = new ExtractionRunsRepository(db);
+  const iieRepo = new InboxItemEntitiesRepository(db);
+  const entitiesRepo = new EntitiesRepository(db);
   const search = new MemorySearchService(
-    new EntitiesRepository(db),
+    entitiesRepo,
     new EventsRepository(db),
     new AssertionsRepository(db),
     new TasksRepository(db),
     new EntityResolutionRepository(db),
+    iieRepo,
   );
   const clarifications = new ClarificationService(new ClarificationsRepository(db));
 
@@ -105,6 +117,24 @@ async function main() {
           properties: { limit: { type: 'number' } },
         },
       },
+      {
+        name: 'list_inbox_extraction_runs',
+        description: 'List extraction runs for an inbox item',
+        inputSchema: {
+          type: 'object',
+          properties: { inbox_item_id: { type: 'string' } },
+          required: ['inbox_item_id'],
+        },
+      },
+      {
+        name: 'list_inbox_item_entities',
+        description: 'List active entities linked to an inbox item',
+        inputSchema: {
+          type: 'object',
+          properties: { inbox_item_id: { type: 'string' } },
+          required: ['inbox_item_id'],
+        },
+      },
     ],
   }));
 
@@ -135,6 +165,19 @@ async function main() {
           result = await listPendingClarifications(
             clarifications,
             listPendingClarificationsInputSchema.parse(args ?? {}),
+          );
+          break;
+        case 'list_inbox_extraction_runs':
+          result = await listInboxExtractionRuns(
+            runsRepo,
+            listInboxExtractionRunsInputSchema.parse(args ?? {}),
+          );
+          break;
+        case 'list_inbox_item_entities':
+          result = await listInboxItemEntities(
+            iieRepo,
+            entitiesRepo,
+            listInboxItemEntitiesInputSchema.parse(args ?? {}),
           );
           break;
         default:

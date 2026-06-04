@@ -1,0 +1,744 @@
+[
+  {
+    "id": "rel-hoje-midday",
+    "input": {
+      "literal": "hoje",
+      "receivedAt": "2026-06-03T15:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "resolved",
+      "localDate": "2026-06-03",
+      "instant": null,
+      "precision": "date",
+      "reasonCode": "relative_day_resolved",
+      "matchedPatternId": "relative_day"
+    }
+  },
+  {
+    "id": "rel-amanha-midday",
+    "input": {
+      "literal": "amanhã",
+      "receivedAt": "2026-06-03T15:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "resolved",
+      "localDate": "2026-06-04",
+      "instant": null,
+      "precision": "date",
+      "reasonCode": "relative_day_resolved"
+    }
+  },
+  {
+    "id": "rel-amanha-no-accent",
+    "input": {
+      "literal": "amanha",
+      "receivedAt": "2026-06-03T15:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "resolved",
+      "localDate": "2026-06-04",
+      "instant": null
+    }
+  },
+  {
+    "id": "rel-ontem",
+    "input": {
+      "literal": "ontem",
+      "receivedAt": "2026-06-03T15:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "resolved",
+      "localDate": "2026-06-02",
+      "instant": null
+    }
+  },
+  {
+    "id": "rel-hoje-near-midnight",
+    "input": {
+      "literal": "hoje",
+      "receivedAt": "2026-06-03T23:55:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "resolved",
+      "localDate": "2026-06-03",
+      "instant": null
+    }
+  },
+  {
+    "id": "rel-hoje-after-midnight",
+    "input": {
+      "literal": "hoje",
+      "receivedAt": "2026-06-04T00:05:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "resolved",
+      "localDate": "2026-06-04",
+      "instant": null
+    }
+  },
+  {
+    "id": "rel-amanha-utc-anchor",
+    "input": {
+      "literal": "amanhã",
+      "receivedAt": "2026-06-03T18:00:00Z",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "resolved",
+      "localDate": "2026-06-04",
+      "instant": null
+    }
+  },
+  {
+    "id": "rel-amanha-as-10h",
+    "input": {
+      "literal": "amanhã às 10h",
+      "receivedAt": "2026-06-03T15:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "resolved",
+      "localDate": "2026-06-04",
+      "localTime": "10:00:00",
+      "precision": "datetime",
+      "dueDateBoundary": "exact",
+      "instantPresent": true,
+      "matchedPatternId": "relative_with_time",
+      "reasonCode": "absolute_datetime_resolved"
+    }
+  },
+  {
+    "id": "rel-amanha-as-10h-no-accent",
+    "input": {
+      "literal": "amanha as 10h",
+      "receivedAt": "2026-06-03T15:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "resolved",
+      "localDate": "2026-06-04",
+      "localTime": "10:00:00",
+      "precision": "datetime",
+      "instantPresent": true,
+      "matchedPatternId": "relative_with_time"
+    }
+  },
+  {
+    "id": "rel-amanha-10h-compact",
+    "input": {
+      "literal": "amanhã 10h",
+      "receivedAt": "2026-06-03T15:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "resolved",
+      "localDate": "2026-06-04",
+      "localTime": "10:00:00",
+      "precision": "datetime",
+      "instantContains": "2026-06-04T13:00:00.000Z",
+      "matchedPatternId": "relative_with_time"
+    }
+  },
+  {
+    "id": "rel-amanha-as-1030",
+    "input": {
+      "literal": "amanhã às 10:30",
+      "receivedAt": "2026-06-03T15:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "resolved",
+      "localDate": "2026-06-04",
+      "localTime": "10:30:00",
+      "precision": "datetime",
+      "instantPresent": true,
+      "matchedPatternId": "relative_with_time"
+    }
+  },
+  {
+    "id": "weekday-plain-sexta-wednesday",
+    "input": {
+      "literal": "sexta-feira",
+      "receivedAt": "2026-06-03T12:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "resolved",
+      "localDate": "2026-06-05",
+      "instant": null,
+      "reasonCode": "weekday_resolved",
+      "matchedPatternId": "weekday_plain"
+    }
+  },
+  {
+    "id": "weekday-plain-sexta-short",
+    "input": {
+      "literal": "sexta",
+      "receivedAt": "2026-06-03T12:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "resolved",
+      "localDate": "2026-06-05",
+      "instant": null
+    }
+  },
+  {
+    "id": "weekday-plain-on-friday-plus-seven",
+    "input": {
+      "literal": "sexta-feira",
+      "receivedAt": "2026-06-05T10:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "resolved",
+      "localDate": "2026-06-12",
+      "instant": null
+    }
+  },
+  {
+    "id": "weekday-proxima-sexta",
+    "input": {
+      "literal": "próxima sexta-feira",
+      "receivedAt": "2026-06-03T12:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "resolved",
+      "localDate": "2026-06-12",
+      "instant": null,
+      "reasonCode": "weekday_next_week_resolved",
+      "matchedPatternId": "weekday_next_week"
+    }
+  },
+  {
+    "id": "weekday-proxima-sexta-no-accent",
+    "input": {
+      "literal": "proxima sexta",
+      "receivedAt": "2026-06-03T12:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "resolved",
+      "localDate": "2026-06-12",
+      "instant": null
+    }
+  },
+  {
+    "id": "weekday-esta-sexta",
+    "input": {
+      "literal": "esta sexta",
+      "receivedAt": "2026-06-03T12:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "resolved",
+      "localDate": "2026-06-05",
+      "instant": null,
+      "reasonCode": "weekday_this_week_resolved",
+      "matchedPatternId": "weekday_this_week"
+    }
+  },
+  {
+    "id": "weekday-essa-sexta",
+    "input": {
+      "literal": "essa sexta-feira",
+      "receivedAt": "2026-06-03T12:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "resolved",
+      "localDate": "2026-06-05",
+      "instant": null
+    }
+  },
+  {
+    "id": "weekday-esta-sexta-after-passed",
+    "input": {
+      "literal": "esta sexta",
+      "receivedAt": "2026-06-07T12:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "resolved",
+      "localDate": "2026-06-12",
+      "instant": null
+    }
+  },
+  {
+    "id": "weekday-segunda-as-10h",
+    "input": {
+      "literal": "segunda-feira às 10h",
+      "receivedAt": "2026-06-03T12:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "resolved",
+      "localDate": "2026-06-08",
+      "localTime": "10:00:00",
+      "precision": "datetime",
+      "dueDateBoundary": "exact",
+      "instantPresent": true
+    }
+  },
+  {
+    "id": "weekday-segunda-as-1030",
+    "input": {
+      "literal": "segunda-feira às 10:30",
+      "receivedAt": "2026-06-03T12:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "resolved",
+      "localDate": "2026-06-08",
+      "localTime": "10:30:00",
+      "precision": "datetime",
+      "instantPresent": true
+    }
+  },
+  {
+    "id": "weekday-sexta-10h-alt",
+    "input": {
+      "literal": "sexta 10h",
+      "receivedAt": "2026-06-03T12:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "resolved",
+      "localDate": "2026-06-05",
+      "localTime": "10:00:00",
+      "precision": "datetime",
+      "instantPresent": true
+    }
+  },
+  {
+    "id": "weekday-domingo-plain",
+    "input": {
+      "literal": "domingo",
+      "receivedAt": "2026-06-03T12:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "resolved",
+      "localDate": "2026-06-07",
+      "instant": null
+    }
+  },
+  {
+    "id": "partial-dia-15-future-in-month",
+    "input": {
+      "literal": "dia 15",
+      "receivedAt": "2026-06-03T12:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "resolved",
+      "localDate": "2026-06-15",
+      "instant": null,
+      "implicitMonth": true,
+      "reasonCode": "partial_date_inferred_month"
+    }
+  },
+  {
+    "id": "partial-dia-15-roll-month",
+    "input": {
+      "literal": "dia 15",
+      "receivedAt": "2026-06-20T12:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "resolved",
+      "localDate": "2026-07-15",
+      "instant": null,
+      "implicitMonth": true
+    }
+  },
+  {
+    "id": "partial-15-06-full-year-inferred",
+    "input": {
+      "literal": "15/06",
+      "receivedAt": "2026-06-03T12:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "resolved",
+      "localDate": "2026-06-15",
+      "instant": null,
+      "implicitYear": true,
+      "reasonCode": "partial_date_inferred_year"
+    }
+  },
+  {
+    "id": "partial-15-06-roll-year",
+    "input": {
+      "literal": "15/06",
+      "receivedAt": "2026-06-20T12:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "resolved",
+      "localDate": "2027-06-15",
+      "instant": null,
+      "implicitYear": true
+    }
+  },
+  {
+    "id": "absolute-15-06-2026",
+    "input": {
+      "literal": "15/06/2026",
+      "receivedAt": "2026-06-03T12:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "resolved",
+      "localDate": "2026-06-15",
+      "instant": null,
+      "implicitYear": false,
+      "implicitMonth": false,
+      "reasonCode": "absolute_date_resolved"
+    }
+  },
+  {
+    "id": "absolute-past-explicit",
+    "input": {
+      "literal": "15/06/2025",
+      "receivedAt": "2026-06-03T12:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "resolved",
+      "localDate": "2025-06-15",
+      "instant": null
+    }
+  },
+  {
+    "id": "invalid-31-02-2026",
+    "input": {
+      "literal": "31/02/2026",
+      "receivedAt": "2026-06-03T12:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "failed",
+      "instant": null,
+      "reasonCode": "impossible_date",
+      "matchedPatternId": "absolute_date_dmy"
+    }
+  },
+  {
+    "id": "invalid-amanha-25h",
+    "input": {
+      "literal": "amanhã às 25h",
+      "receivedAt": "2026-06-03T12:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "failed",
+      "instant": null,
+      "reasonCode": "impossible_time",
+      "matchedPatternId": "relative_with_time"
+    }
+  },
+  {
+    "id": "vague-fim-semana",
+    "input": {
+      "literal": "no fim da semana",
+      "receivedAt": "2026-06-03T12:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "ambiguous",
+      "instant": null,
+      "reasonCode": "vague_expression",
+      "matchedPatternId": "vague_ambiguous"
+    }
+  },
+  {
+    "id": "vague-mais-tarde",
+    "input": {
+      "literal": "mais tarde",
+      "receivedAt": "2026-06-03T12:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "not_applicable",
+      "instant": null,
+      "reasonCode": "vague_expression"
+    }
+  },
+  {
+    "id": "vague-depois",
+    "input": {
+      "literal": "depois",
+      "receivedAt": "2026-06-03T12:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "not_applicable",
+      "instant": null
+    }
+  },
+  {
+    "id": "vague-em-breve",
+    "input": {
+      "literal": "em breve",
+      "receivedAt": "2026-06-03T12:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "not_applicable",
+      "instant": null
+    }
+  },
+  {
+    "id": "vague-proxima-etapa",
+    "input": {
+      "literal": "na próxima etapa",
+      "receivedAt": "2026-06-03T12:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "not_applicable",
+      "instant": null,
+      "reasonCode": "no_temporal_tokens"
+    }
+  },
+  {
+    "id": "tz-missing-default",
+    "input": {
+      "literal": "hoje",
+      "receivedAt": "2026-06-03T12:00:00-03:00"
+    },
+    "expected": {
+      "status": "resolved",
+      "localDate": "2026-06-03",
+      "timezone": "America/Sao_Paulo",
+      "timezoneSource": "default"
+    }
+  },
+  {
+    "id": "tz-null-default",
+    "input": {
+      "literal": "hoje",
+      "receivedAt": "2026-06-03T12:00:00-03:00",
+      "timezone": null
+    },
+    "expected": {
+      "status": "resolved",
+      "timezoneSource": "default"
+    }
+  },
+  {
+    "id": "tz-invalid-failed",
+    "input": {
+      "literal": "hoje",
+      "receivedAt": "2026-06-03T12:00:00-03:00",
+      "timezone": "Foo/Bar"
+    },
+    "expected": {
+      "status": "failed",
+      "reasonCode": "timezone_invalid",
+      "instant": null,
+      "matchedPatternId": "timezone_validation"
+    }
+  },
+  {
+    "id": "edge-month-roll-amanha",
+    "input": {
+      "literal": "amanhã",
+      "receivedAt": "2026-01-31T12:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "resolved",
+      "localDate": "2026-02-01",
+      "instant": null
+    }
+  },
+  {
+    "id": "edge-year-roll-amanha",
+    "input": {
+      "literal": "amanhã",
+      "receivedAt": "2025-12-31T12:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "resolved",
+      "localDate": "2026-01-01",
+      "instant": null
+    }
+  },
+  {
+    "id": "edge-dia-15-jan-roll-year",
+    "input": {
+      "literal": "dia 15",
+      "receivedAt": "2026-12-20T12:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "resolved",
+      "localDate": "2027-01-15",
+      "instant": null,
+      "implicitMonth": true
+    }
+  },
+  {
+    "id": "empty-literal",
+    "input": {
+      "literal": "",
+      "receivedAt": "2026-06-03T12:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "not_applicable",
+      "reasonCode": "empty_literal",
+      "instant": null
+    }
+  },
+  {
+    "id": "null-literal",
+    "input": {
+      "literal": null,
+      "receivedAt": "2026-06-03T12:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "not_applicable",
+      "reasonCode": "empty_literal"
+    }
+  },
+  {
+    "id": "unmatched-urgente",
+    "input": {
+      "literal": "urgente",
+      "receivedAt": "2026-06-03T12:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "not_applicable",
+      "reasonCode": "no_temporal_tokens",
+      "matchedPatternId": "unmatched"
+    }
+  },
+  {
+    "id": "literal-preserved-spacing",
+    "input": {
+      "literal": "  sexta-feira  ",
+      "receivedAt": "2026-06-03T12:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "resolved",
+      "literal": "  sexta-feira  ",
+      "localDate": "2026-06-05"
+    }
+  },
+  {
+    "id": "weekday-terca-accent",
+    "input": {
+      "literal": "terça-feira",
+      "receivedAt": "2026-06-03T12:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "resolved",
+      "localDate": "2026-06-09",
+      "instant": null
+    }
+  },
+  {
+    "id": "weekday-quarta-proxima",
+    "input": {
+      "literal": "próxima quarta",
+      "receivedAt": "2026-06-03T12:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "resolved",
+      "localDate": "2026-06-10",
+      "instant": null
+    }
+  },
+  {
+    "id": "partial-dia-31-feb-fail",
+    "input": {
+      "literal": "dia 31",
+      "receivedAt": "2026-02-03T12:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "failed",
+      "reasonCode": "impossible_date"
+    }
+  },
+  {
+    "id": "datetime-instant-offset-sp",
+    "input": {
+      "literal": "segunda-feira as 10h",
+      "receivedAt": "2026-06-03T12:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "resolved",
+      "localDate": "2026-06-08",
+      "localTime": "10:00:00",
+      "instantContains": "2026-06-08T13:00:00.000Z"
+    }
+  },
+  {
+    "id": "normalizer-version",
+    "input": {
+      "literal": "hoje",
+      "receivedAt": "2026-06-03T12:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "normalizerId": "temporal-normalizer",
+      "normalizerVersion": "1.0.0"
+    }
+  },
+  {
+    "id": "date-only-due-boundary-null",
+    "input": {
+      "literal": "15/06/2026",
+      "receivedAt": "2026-06-03T12:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "dueDateBoundary": null,
+      "localTime": null
+    }
+  },
+  {
+    "id": "weekday-sabado-accent",
+    "input": {
+      "literal": "sábado",
+      "receivedAt": "2026-06-03T12:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "resolved",
+      "localDate": "2026-06-06",
+      "instant": null
+    }
+  },
+  {
+    "id": "rel-ontem-year-boundary",
+    "input": {
+      "literal": "ontem",
+      "receivedAt": "2026-01-01T12:00:00-03:00",
+      "timezone": "America/Sao_Paulo"
+    },
+    "expected": {
+      "status": "resolved",
+      "localDate": "2025-12-31",
+      "instant": null
+    }
+  }
+]

@@ -28,6 +28,7 @@ export class MemoryResolverService {
     inboxItemId: string,
     entities: ExtractedEntity[],
     rawContent: string,
+    extractionRunId?: string | null,
   ): Promise<ResolvedEntityMap> {
     const byExtractedName = new Map<string, string>();
     const resolutions: EntityResolutionResult[] = [];
@@ -46,13 +47,13 @@ export class MemoryResolverService {
           candidates: [],
         };
         resolutions.push(result);
-        await this.resolutionRepo.log(inboxItemId, result);
+        await this.resolutionRepo.log(inboxItemId, result, extractionRunId);
         continue;
       }
 
       const result = await this.resolveOne(entity.name, rawContent);
       resolutions.push(result);
-      await this.resolutionRepo.log(inboxItemId, result);
+      await this.resolutionRepo.log(inboxItemId, result, extractionRunId);
 
       if (result.status === 'resolved' && result.resolvedEntityId) {
         byExtractedName.set(normalized, result.resolvedEntityId);

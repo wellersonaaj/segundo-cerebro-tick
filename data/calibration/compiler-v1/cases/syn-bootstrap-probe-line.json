@@ -1,0 +1,82 @@
+{
+  "scenario_id": "syn-bootstrap-probe-line",
+  "category": "bootstrap_panorama",
+  "source_channel": "bootstrap",
+  "source_mode": "passive",
+  "fixture_origin": "synthetic",
+  "raw_content": "Panorama: Alex, Dana, Chris. Probe concorrência stale.",
+  "test_only_fragments": [
+    "Probe"
+  ],
+  "extractor_output": {
+    "schema_version": "1.3",
+    "inbox_item_id": "00000000-0000-4000-8000-000000000030",
+    "events": [
+      {
+        "event_type": "profile_created",
+        "description": "panorama",
+        "occurred_at": null,
+        "source_excerpt": "Panorama",
+        "confidence": 0.7,
+        "entity_names": []
+      }
+    ],
+    "entities": [
+      {
+        "name": "Alex Costa",
+        "entity_type": "person",
+        "source_excerpt": "Alex Costa",
+        "confidence": 0.9,
+        "aliases": []
+      },
+      {
+        "name": "Dana Silva",
+        "entity_type": "person",
+        "source_excerpt": "Dana Silva",
+        "confidence": 0.9,
+        "aliases": []
+      },
+      {
+        "name": "Chris Oliveira",
+        "entity_type": "person",
+        "source_excerpt": "Chris Oliveira",
+        "confidence": 0.9,
+        "aliases": []
+      },
+      {
+        "name": "Probe",
+        "entity_type": "other",
+        "source_excerpt": "Probe",
+        "confidence": 0.3,
+        "aliases": []
+      }
+    ],
+    "assertions": [],
+    "tasks": [],
+    "clarification_requests": [],
+    "requires_review": false,
+    "review_reasons": [],
+    "processing_notes": []
+  },
+  "expected": {
+    "must_not_have": {
+      "entities": [
+        "Probe"
+      ],
+      "events": [
+        "profile_created"
+      ]
+    },
+    "must_have": {
+      "entities": [
+        "Alex Costa",
+        "Dana Silva",
+        "Chris Oliveira"
+      ]
+    }
+  },
+  "received_at": "2026-06-01T12:00:00-03:00",
+  "timezone": "America/Sao_Paulo",
+  "extractor_version": "extractor-v1.3",
+  "captured_at": "2026-06-02T12:00:00Z"
+}

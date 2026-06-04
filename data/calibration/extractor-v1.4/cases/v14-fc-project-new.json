@@ -1,0 +1,9 @@
+{
+  "scenario_id": "v14-fc-project-new",
+  "regime": "first_contact",
+  "ingestion_context_id": "empty",
+  "fixture_origin": "synthetic",
+  "source_channel": "calibration",
+  "source_mode": "conversational",
+  "raw_content": "[SOURCE_BLOCK:raw]\nComeçamos a integração com a Tagna."
+}

@@ -1,0 +1,68 @@
+{
+  "scenario_id": "syn-static-preferences",
+  "category": "static_preferences",
+  "source_channel": "bootstrap",
+  "source_mode": "passive",
+  "fixture_origin": "synthetic",
+  "raw_content": "Alex prefere reuniões pela manhã. Dana cuida do financeiro. Chris lidera engenharia.",
+  "extractor_output": {
+    "schema_version": "1.3",
+    "inbox_item_id": "00000000-0000-4000-8000-000000000002",
+    "events": [
+      {
+        "event_type": "conversation",
+        "description": "Preferência de horário",
+        "occurred_at": null,
+        "source_excerpt": "prefere reuniões",
+        "confidence": 0.7,
+        "entity_names": [
+          "Alex"
+        ]
+      }
+    ],
+    "entities": [
+      {
+        "name": "Alex Costa",
+        "entity_type": "person",
+        "source_excerpt": "Alex Costa",
+        "confidence": 0.9,
+        "aliases": []
+      }
+    ],
+    "assertions": [
+      {
+        "assertion_type": "fact",
+        "content": "Alex prefere reuniões pela manhã",
+        "status": "supported",
+        "source_excerpt": "prefere",
+        "confidence": 0.85
+      }
+    ],
+    "tasks": [],
+    "clarification_requests": [],
+    "requires_review": false,
+    "review_reasons": [],
+    "processing_notes": []
+  },
+  "expected": {
+    "must_not_have": {
+      "events": [
+        "conversation"
+      ]
+    },
+    "must_have": {
+      "assertions": [
+        "prefere reuniões"
+      ]
+    },
+    "allowed": {
+      "entities": [
+        "Alex Costa"
+      ]
+    }
+  },
+  "received_at": "2026-06-01T12:00:00-03:00",
+  "timezone": "America/Sao_Paulo",
+  "extractor_version": "extractor-v1.3",
+  "captured_at": "2026-06-02T12:00:00Z"
+}

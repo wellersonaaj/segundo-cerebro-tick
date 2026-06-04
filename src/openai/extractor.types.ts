@@ -14,6 +14,7 @@ const extractedEntitySchema = z.object({
   ]),
   source_excerpt: z.string(),
   confidence: z.number(),
+  aliases: z.array(z.string()),
 });
 
 const extractedEventSchema = z.object({

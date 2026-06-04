@@ -1,0 +1,37 @@
+{
+  "schema_version": "external-action-s31-v1",
+  "description": "Bateria curta S3.1 — classificação de ações externas pelo extractor v1.4",
+  "defaults": {
+    "source_channel": "external-action-calibration-s31",
+    "source_mode": "conversational",
+    "received_at": "2026-05-31T10:00:00-03:00",
+    "timezone": "America/Sao_Paulo"
+  },
+  "cases": [
+    {
+      "id": "ea-01-contrato",
+      "raw_content": "Envie o contrato para o cliente amanhã.",
+      "expected": "external_action"
+    },
+    {
+      "id": "ea-02-email",
+      "raw_content": "Mande um e-mail para o Bruno.",
+      "expected": "external_action"
+    },
+    {
+      "id": "ea-03-reuniao",
+      "raw_content": "Agende uma reunião com o fornecedor na sexta-feira.",
+      "expected": "external_action"
+    },
+    {
+      "id": "ea-04-resposta",
+      "raw_content": "Responda ao Marcelo confirmando o horário.",
+      "expected": "external_action"
+    },
+    {
+      "id": "ea-05-calendario",
+      "raw_content": "Crie um evento no calendário para a reunião.",
+      "expected": "external_action"
+    }
+  ]
+}

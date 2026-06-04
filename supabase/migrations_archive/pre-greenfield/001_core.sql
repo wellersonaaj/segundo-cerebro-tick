@@ -18,6 +18,7 @@ create table if not exists inbox_items (
   ),
   extractor_version text,
   processing_error text,
+  processed_at timestamptz,
   created_at timestamptz not null default now()
 );
 
@@ -85,6 +86,7 @@ create table if not exists event_entities (
   event_id uuid not null references events (id) on delete cascade,
   entity_id uuid not null references entities (id) on delete restrict,
   role text,
+  relation_type text not null default 'mentioned',
   created_at timestamptz not null default now(),
   unique (event_id, entity_id)
 );

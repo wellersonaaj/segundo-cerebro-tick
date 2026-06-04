@@ -5,9 +5,20 @@ export class ClarificationsRepository {
   constructor(private readonly db: SupabaseClient) {}
 
   async createMany(inboxItemId: string, items: ExtractedClarification[]): Promise<ClarificationRequest[]> {
+    return this.createManyCandidates(inboxItemId, null, items);
+  }
+
+  async createManyCandidates(
+    inboxItemId: string,
+    extractionRunId: string | null,
+    items: ExtractedClarification[],
+    correctionId?: string,
+  ): Promise<ClarificationRequest[]> {
+    void correctionId;
     if (!items.length) return [];
     const rows = items.map((c) => ({
       inbox_item_id: inboxItemId,
+      extraction_run_id: extractionRunId,
       target_type: c.target_type,
       target_reference: c.target_reference,
       issue_type: c.issue_type,
@@ -18,14 +29,52 @@ export class ClarificationsRepository {
       suggested_answers: c.suggested_answers,
       source_excerpt: c.source_excerpt,
       status: 'pending' as const,
+      record_status: 'candidate' as const,
     }));
     const { data, error } = await this.db.from('clarification_requests').insert(rows).select();
-    if (error) throw new Error(`clarifications.createMany: ${error.message}`);
+    if (error) throw new Error(`clarifications.createManyCandidates: ${error.message}`);
     return (data ?? []) as ClarificationRequest[];
   }
 
+  async listByInboxItem(inboxItemId: string): Promise<ClarificationRequest[]> {
+    const { data, error } = await this.db
+      .from('clarification_requests')
+      .select()
+      .eq('inbox_item_id', inboxItemId)
+      .eq('record_status', 'active')
+      .order('created_at', { ascending: true });
+    if (error) throw new Error(`clarifications.listByInboxItem: ${error.message}`);
+    return (data ?? []) as ClarificationRequest[];
+  }
+
+  async pendingCountsByInboxIds(inboxItemIds: string[]): Promise<Map<string, number>> {
+    const counts = new Map<string, number>();
+    if (!inboxItemIds.length) return counts;
+
+    const { data, error } = await this.db
+      .from('clarification_requests')
+      .select('inbox_item_id')
+      .in('inbox_item_id', inboxItemIds)
+      .eq('record_status', 'active')
+      .eq('status', 'pending');
+    if (error) throw new Error(`clarifications.pendingCountsByInboxIds: ${error.message}`);
+
+    for (const id of inboxItemIds) {
+      counts.set(id, 0);
+    }
+    for (const row of data ?? []) {
+      const inboxItemId = row.inbox_item_id as string;
+      counts.set(inboxItemId, (counts.get(inboxItemId) ?? 0) + 1);
+    }
+    return counts;
+  }
+
   async list(status?: ClarificationStatus, limit = 50): Promise<ClarificationRequest[]> {
-    let q = this.db.from('clarification_requests').select().order('created_at', { ascending: false });
+    let q = this.db
+      .from('clarification_requests')
+      .select()
+      .eq('record_status', 'active')
+      .order('created_at', { ascending: false });
     if (status) q = q.eq('status', status);
     const { data, error } = await q.limit(limit);
     if (error) throw new Error(`clarifications.list: ${error.message}`);

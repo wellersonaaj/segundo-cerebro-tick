@@ -1,0 +1,4 @@
+-- Patch pós-apply: promote não bloqueia em clarifications task_execution (ex. missing_task_target).
+-- Reaplica RPCs greenfield (CREATE OR REPLACE idempotente).
+--
+--   psql "$DATABASE_URL" -f supabase/migrations/20260602100001_greenfield_rpcs.sql

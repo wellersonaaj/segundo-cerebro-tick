@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Auditoria — Segundo Cérebro</title>
+    <link rel="stylesheet" href="/audit/styles.css" />
+  </head>
+  <body>
+    <header class="page-header">
+      <h1>Auditoria de entradas</h1>
+      <p class="subtitle">Somente leitura · homologação interna</p>
+    </header>
+
+    <div id="access-gate" class="access-gate hidden">
+      <p>Esta tela exige o segredo interno (<code>INTERNAL_PROCESSING_SECRET</code>).</p>
+      <label>
+        Segredo
+        <input id="access-secret-input" type="password" autocomplete="off" />
+      </label>
+      <button id="access-secret-submit" type="button">Continuar</button>
+    </div>
+
+    <main id="audit-app" class="audit-layout hidden">
+      <aside class="list-panel">
+        <div class="list-toolbar">
+          <div class="filter-group" role="group" aria-label="Filtros de status">
+            <button type="button" class="filter-btn active" data-filter="todos">Todos</button>
+            <button type="button" class="filter-btn" data-filter="revisar">Revisar</button>
+            <button type="button" class="filter-btn" data-filter="falhas">Falhas</button>
+          </div>
+          <label class="search-field">
+            Buscar no conteúdo
+            <input id="search-input" type="search" placeholder="Texto original…" />
+          </label>
+        </div>
+        <div id="list-status" class="list-status" aria-live="polite"></div>
+        <ul id="inbox-list" class="inbox-list"></ul>
+      </aside>
+
+      <section class="detail-panel">
+        <div id="detail-status" class="detail-status" aria-live="polite"></div>
+        <div id="detail-content" class="detail-content"></div>
+      </section>
+    </main>
+
+    <script src="/audit/app.js" defer></script>
+  </body>
+</html>

@@ -1,0 +1,8 @@
+{
+  "scenario_id": "v14-task-cancel",
+  "category": "task_cancel",
+  "fixture_origin": "synthetic",
+  "source_channel": "calibration",
+  "source_mode": "conversational",
+  "raw_content": "[SOURCE_BLOCK:raw]\nCancelada a tarefa de deploy beta."
+}

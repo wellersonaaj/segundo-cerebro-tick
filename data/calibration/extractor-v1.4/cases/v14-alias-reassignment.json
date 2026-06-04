@@ -1,0 +1,8 @@
+{
+  "scenario_id": "v14-alias-reassignment",
+  "category": "alias_reassignment",
+  "fixture_origin": "synthetic",
+  "source_channel": "calibration",
+  "source_mode": "conversational",
+  "raw_content": "[SOURCE_BLOCK:raw]\nCodinome Fox-1 agora se refere a Pat Lee, não mais a Sam Fox."
+}

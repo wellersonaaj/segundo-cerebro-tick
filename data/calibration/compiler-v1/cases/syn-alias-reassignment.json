@@ -1,0 +1,62 @@
+{
+  "scenario_id": "syn-alias-reassignment",
+  "category": "alias_reassignment",
+  "fixture_origin": "synthetic",
+  "raw_content": "Codinome Fox agora se refere a Pat Lee, não mais a Sam Fox.",
+  "extractor_output": {
+    "schema_version": "1.3",
+    "inbox_item_id": "00000000-0000-4000-8000-000000000012",
+    "events": [],
+    "entities": [
+      {
+        "name": "Fox",
+        "entity_type": "person",
+        "source_excerpt": "Fox",
+        "confidence": 0.9,
+        "aliases": []
+      },
+      {
+        "name": "Pat Lee",
+        "entity_type": "person",
+        "source_excerpt": "Pat Lee",
+        "confidence": 0.9,
+        "aliases": []
+      },
+      {
+        "name": "Sam Fox",
+        "entity_type": "person",
+        "source_excerpt": "Sam Fox",
+        "confidence": 0.9,
+        "aliases": []
+      }
+    ],
+    "assertions": [],
+    "tasks": [],
+    "clarification_requests": [],
+    "requires_review": false,
+    "review_reasons": [],
+    "processing_notes": []
+  },
+  "expected": {
+    "must_have": {
+      "alias_targets": [
+        "Pat Lee"
+      ]
+    },
+    "must_not_have": {
+      "entities": [
+        "Fox"
+      ]
+    },
+    "allowed": {
+      "entities": [
+        "Pat Lee"
+      ]
+    }
+  },
+  "source_mode": "conversational",
+  "received_at": "2026-06-01T12:00:00-03:00",
+  "timezone": "America/Sao_Paulo",
+  "extractor_version": "extractor-v1.3",
+  "captured_at": "2026-06-02T12:00:00Z"
+}

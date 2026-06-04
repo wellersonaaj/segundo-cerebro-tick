@@ -1,0 +1,8 @@
+{
+  "scenario_id": "v14-task-completed",
+  "category": "task_completed",
+  "fixture_origin": "synthetic",
+  "source_channel": "calibration",
+  "source_mode": "conversational",
+  "raw_content": "[SOURCE_BLOCK:raw]\nConcluída a tarefa de migração do módulo 2."
+}

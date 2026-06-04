@@ -160,6 +160,7 @@ create table if not exists event_entities (
 alter table event_entities add column if not exists event_id uuid;
 alter table event_entities add column if not exists entity_id uuid;
 alter table event_entities add column if not exists role text;
+alter table event_entities add column if not exists relation_type text;
 alter table event_entities add column if not exists created_at timestamptz;
 
 update event_entities set created_at = now() where created_at is null;

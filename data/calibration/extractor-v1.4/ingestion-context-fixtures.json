@@ -1,0 +1,101 @@
+{
+  "contexts": {
+    "empty": {
+      "activeProjects": [],
+      "openTasks": [],
+      "activeAliases": [],
+      "recentEntities": [],
+      "recentAssertions": [],
+      "recentEvents": [],
+      "sourceMetadata": { "entityLike": {}, "routing": {} }
+    },
+    "atlas_single_task": {
+      "activeProjects": [
+        {
+          "id": "proj-atlas",
+          "reference": "Projeto Atlas",
+          "normalizedReference": "projeto atlas"
+        }
+      ],
+      "openTasks": [
+        {
+          "id": "task-revisar-contrato",
+          "reference": "Revisar contrato",
+          "normalizedReference": "revisar contrato",
+          "projectReference": "Projeto Atlas",
+          "status": "open",
+          "threadReferences": ["thread-atlas-1"],
+          "lastMentionedAt": "2026-06-01T10:00:00Z"
+        }
+      ],
+      "activeAliases": [],
+      "recentEntities": [],
+      "recentAssertions": [],
+      "recentEvents": [],
+      "sourceMetadata": {
+        "entityLike": {},
+        "routing": { "thread_reference": "thread-atlas-1", "subject": "Revisão contrato Atlas" }
+      }
+    },
+    "two_contract_reviews": {
+      "activeProjects": [],
+      "openTasks": [
+        {
+          "id": "task-review-a",
+          "reference": "Revisar contrato fornecedor A",
+          "normalizedReference": "revisar contrato fornecedor a",
+          "status": "open",
+          "threadReferences": ["thread-reviews"]
+        },
+        {
+          "id": "task-review-b",
+          "reference": "Revisar contrato fornecedor B",
+          "normalizedReference": "revisar contrato fornecedor b",
+          "status": "open",
+          "threadReferences": ["thread-reviews"]
+        }
+      ],
+      "activeAliases": [],
+      "recentEntities": [],
+      "recentAssertions": [],
+      "recentEvents": [],
+      "sourceMetadata": {
+        "entityLike": {},
+        "routing": { "thread_reference": "thread-reviews", "subject": "Revisões de contrato" }
+      }
+    },
+    "homologar_integracao": {
+      "activeProjects": [],
+      "openTasks": [
+        {
+          "id": "task-homologar",
+          "reference": "Homologar integração",
+          "normalizedReference": "homologar integracao",
+          "status": "open",
+          "assigneeReference": "Alex Costa"
+        }
+      ],
+      "activeAliases": [],
+      "recentEntities": [],
+      "recentAssertions": [],
+      "recentEvents": [],
+      "sourceMetadata": { "entityLike": {}, "routing": {} }
+    },
+    "cobrar_fornecedor": {
+      "activeProjects": [],
+      "openTasks": [
+        {
+          "id": "task-cobrar",
+          "reference": "Cobrar fornecedor",
+          "normalizedReference": "cobrar fornecedor",
+          "status": "open"
+        }
+      ],
+      "activeAliases": [],
+      "recentEntities": [],
+      "recentAssertions": [],
+      "recentEvents": [],
+      "sourceMetadata": { "entityLike": {}, "routing": {} }
+    }
+  }
+}

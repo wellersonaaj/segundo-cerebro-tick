@@ -606,3 +606,50 @@ Executar somente esta sequência:
 10. congelar versão antes de persistir em produção
 ```
 
+---
+
+# 16. Atualização MVP (2026-05-31) — pós-auditoria bootstrap
+
+Ver também `docs/decisoes-arquiteturais.md` e `docs/changelog-arquitetural.md`.
+
+Itens concluídos neste ciclo:
+
+```text
+entity_aliases como única fonte persistida de aliases (entities.aliases removido — migration 010)
+REST/MCP hidratam aliases via join
+bootstrap linking por source_channel + evento principal determinístico
+uso cotidiano mantém linking contextual
+investigação assertions: sem limite artificial de 15
+smoke bootstrap atualizado (não roda em npm test)
+```
+
+Próximo passo operacional antes do arquivo 02:
+
+```text
+aplicar migration 010 no Supabase
+reset + reimportar 01-identidade-e-pessoas.md
+npm run test:bootstrap:smoke
+```
+
+---
+
+# 17. Pendências pós-S3 — uso real assistido (2026-06-03)
+
+Registradas no bloco S3; **não implementar** até falha real ou nova autorização.
+
+| ID | Pendência | Contexto |
+|----|-----------|----------|
+| S3-P1 | SSL de `db:apply-incremental-migrations` em ambiente Node local | `apply-incremental-migrations.ts` falha conexão Postgres direta; homolog já validada via `verify:env` runtime |
+| S3-P2 | HTTP 422 `needs_clarification` em `POST /corrections` | Hoje correções retornam 201 ou 500; falta contrato explícito para clarification bloqueante no fluxo de correção |
+| S3-P3 | Isolamento definitivo do path extractor v1.3 | Shadow v1.4 + greenfield ativos; v1.3 ainda no caminho de POST `/inbox-items` |
+| S3-P4 | Normalização temporal futura de `occurred_at` semântico | Datas relativas e âncoras semânticas fora do escopo MVP bootstrap |
+| S3-P5 | Interface futura de revisão | UI/revisão humana de assertions, clarifications e promote parcial — fora do escopo S3 |
+
+| S3-P6 | `GET /entities/:id/events` vazio com assertions relacionadas | Endpoint consulta só `event_entities`; assertions ligadas à entidade aparecem em `/memory/search` mas não em `/events` — requer enriquecimento localizado ou Context Builder (fora do escopo S3.1) |
+
+| S3-P7 | Detecção end-to-end inconsistente de `external_action` | Bateria S3.1 (`npm run test:external-action:classification`); execução externa proibida operacionalmente até validação ampliada |
+
+Referência operacional: `docs/playbook-uso-real-assistido.md`, fixtures `data/bootstrap/s3-controlled-fixtures.json`, runner `npm run bootstrap:controlled`.
+
+**Correção S3.1 aplicada:** `GET /tasks` enriquece `inbox_item_id` via join com `task_mutations` active (projeção greenfield não persiste lineage na tabela `tasks`).
+

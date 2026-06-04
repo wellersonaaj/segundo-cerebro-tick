@@ -1,4 +1,4 @@
-/** JSON Schema for OpenAI Structured Outputs — extractor-v1.2 */
+/** JSON Schema for OpenAI Structured Outputs — extractor-v1.3 */
 export const extractorJsonSchema = {
   type: 'object',
   additionalProperties: false,
@@ -53,8 +53,12 @@ export const extractorJsonSchema = {
           },
           source_excerpt: { type: 'string' },
           confidence: { type: 'number' },
+          aliases: {
+            type: 'array',
+            items: { type: 'string' },
+          },
         },
-        required: ['name', 'entity_type', 'source_excerpt', 'confidence'],
+        required: ['name', 'entity_type', 'source_excerpt', 'confidence', 'aliases'],
       },
     },
     assertions: {

@@ -1,0 +1,9 @@
+{
+  "scenario_id": "v14-fc-status-new",
+  "regime": "first_contact",
+  "ingestion_context_id": "empty",
+  "fixture_origin": "synthetic",
+  "source_channel": "calibration",
+  "source_mode": "conversational",
+  "raw_content": "[SOURCE_BLOCK:raw]\nO Projeto Atlas está em homologação."
+}

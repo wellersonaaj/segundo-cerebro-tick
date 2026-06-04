@@ -1,0 +1,7 @@
+{
+  "normalizerId": "temporal-normalizer",
+  "normalizerVersion": "1.0.0",
+  "casesFile": "cases.json",
+  "baselineFile": "v1.0.0-baseline.json",
+  "description": "Deterministic temporal normalization calibration — no OpenAI, no DB"
+}

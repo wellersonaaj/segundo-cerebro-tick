@@ -1,0 +1,8 @@
+{
+  "scenario_id": "v14-confirmation",
+  "category": "episodic_confirmation",
+  "fixture_origin": "synthetic",
+  "source_channel": "calibration",
+  "source_mode": "conversational",
+  "raw_content": "[SOURCE_BLOCK:raw]\nDana Silva confirmou o envio do contrato 3 ontem."
+}

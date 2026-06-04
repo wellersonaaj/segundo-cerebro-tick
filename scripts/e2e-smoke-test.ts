@@ -1,6 +1,7 @@
 /**
  * Homologação E2E — requer API rodando (`npm run dev`) e credenciais em `.env`.
- * Migrations 001 e 002 obrigatórias; 003 opcional (cenário Genius).
+ * Pré-requisito: schema greenfield v2 aplicado (`db:apply-greenfield-schema`).
+ * Com GREENFIELD_SCHEMA=true: greenfield baseline, RPCs v2, PersistenceV2.
  */
 
 import { loadDotEnv } from '../src/config/load-dotenv.js';
@@ -67,6 +68,18 @@ function checkEnv(): void {
     fail(`Variáveis ausentes: ${missing.join(', ')}. Configure .env antes de rodar.`);
   }
   ok('Variáveis SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY e OPENAI_API_KEY presentes');
+
+  if (process.env.GREENFIELD_SCHEMA === 'true') {
+    console.log('\nModo greenfield v2:');
+    console.log('  • greenfield baseline (migrations 20260602100000–100002)');
+    console.log('  • RPCs v2 (start / promote / fail_extraction_run)');
+    console.log('  • PersistenceV2 (EXTRACTOR_V14_SHADOW + PERSIST_COMPILED_MEMORY_V2)');
+    ok('GREENFIELD_SCHEMA=true — stack v2 esperada');
+  } else {
+    console.warn(
+      '\n⚠ GREENFIELD_SCHEMA não está true — E2E assume homologação legada ou flags incompletas.',
+    );
+  }
 }
 
 async function fetchJson(
@@ -169,10 +182,10 @@ async function main(): Promise<void> {
   const hasExactAlias = (mem.entities ?? []).some((e) => e.match_type === 'exact_alias');
 
   if (hasGeniusHotels || hasExactAlias) {
-    ok('Genius resolvida para Genius Hotels (seed 003 + memory resolver)');
+    ok('Genius resolvida para Genius Hotels (seed greenfield + memory resolver)');
   } else {
     console.warn(
-      '⚠ Genius não resolvida para Genius Hotels — aplique migration 003_seed_genius_example.sql',
+      '⚠ Genius não resolvida para Genius Hotels — aplique greenfield seeds (20260602100002)',
     );
   }
 
@@ -242,10 +255,14 @@ async function main(): Promise<void> {
   console.log('\n--- GET /clarifications?status=pending ---');
   console.log(JSON.stringify(clarifications.body, null, 2));
 
-  const pending = clarifications.body as Array<Record<string, unknown>>;
+  const pendingAll = clarifications.body as Array<Record<string, unknown>>;
+  const pending = pendingAll.filter((c) => c.inbox_item_id === inboxId);
 
   if (pending.length !== 1) {
-    fail(`Esperada exatamente 1 clarification_request pending, obtidas: ${pending.length}`);
+    fail(
+      `Esperada exatamente 1 clarification_request pending neste inbox, obtidas: ${pending.length} ` +
+        `(total global pending: ${pendingAll.length})`,
+    );
   }
 
   const c = pending[0]!;

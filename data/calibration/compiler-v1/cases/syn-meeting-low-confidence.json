@@ -1,0 +1,39 @@
+{
+  "scenario_id": "syn-meeting-low-confidence",
+  "category": "episodic_meeting",
+  "fixture_origin": "synthetic",
+  "raw_content": "Houve menção a reunião sem participante claro.",
+  "extractor_output": {
+    "schema_version": "1.3",
+    "inbox_item_id": "00000000-0000-4000-8000-000000000031",
+    "events": [
+      {
+        "event_type": "meeting",
+        "description": "reunião",
+        "occurred_at": null,
+        "source_excerpt": "reunião",
+        "confidence": 0.4,
+        "entity_names": []
+      }
+    ],
+    "entities": [],
+    "assertions": [],
+    "tasks": [],
+    "clarification_requests": [],
+    "requires_review": false,
+    "review_reasons": [],
+    "processing_notes": []
+  },
+  "expected": {
+    "must_not_have": {
+      "events": [
+        "meeting"
+      ]
+    }
+  },
+  "source_mode": "conversational",
+  "received_at": "2026-06-01T12:00:00-03:00",
+  "timezone": "America/Sao_Paulo",
+  "extractor_version": "extractor-v1.3",
+  "captured_at": "2026-06-02T12:00:00Z"
+}

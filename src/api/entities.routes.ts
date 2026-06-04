@@ -21,6 +21,13 @@ export async function registerEntitiesRoutes(
     return details;
   });
 
+  app.get('/entities/:id/sources', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const entity = await entitiesRepo.findById(id);
+    if (!entity) return reply.status(404).send({ error: 'Not found' });
+    return search.getEntitySources(id);
+  });
+
   app.get('/entities/:id/events', async (req, reply) => {
     const { id } = req.params as { id: string };
     const entity = await entitiesRepo.findById(id);

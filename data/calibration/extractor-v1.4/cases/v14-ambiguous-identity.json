@@ -1,0 +1,8 @@
+{
+  "scenario_id": "v14-ambiguous-identity",
+  "category": "ambiguous_identity",
+  "fixture_origin": "synthetic",
+  "source_channel": "calibration",
+  "source_mode": "conversational",
+  "raw_content": "[SOURCE_BLOCK:raw]\nO relatório foi enviado por Chris. (Pode ser Chris Oliveira ou Chris Mendes.)"
+}

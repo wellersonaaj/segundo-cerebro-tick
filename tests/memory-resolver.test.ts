@@ -36,7 +36,7 @@ describe('MemoryResolverService', () => {
     const resolver = new MemoryResolverService(entitiesRepo, resolutionRepo);
     const result = await resolver.resolveEntities(
       'inbox-1',
-      [{ name: 'Genius', entity_type: 'other', source_excerpt: 'Genius', confidence: 0.7 }],
+      [{ name: 'Genius', entity_type: 'other', aliases: [], source_excerpt: 'Genius', confidence: 0.7 }],
       'Conversei com o Bruno sobre a Genius.',
     );
 
@@ -116,7 +116,7 @@ describe('MemoryResolverService', () => {
     const resolver = new MemoryResolverService(entitiesRepo, resolutionRepo);
     const { resolutions } = await resolver.resolveEntities(
       'inbox-2',
-      [{ name: 'Genius', entity_type: 'other', source_excerpt: 'x', confidence: 0.5 }],
+      [{ name: 'Genius', entity_type: 'other', aliases: [], source_excerpt: 'x', confidence: 0.5 }],
       'Genius',
     );
     expect(resolutions[0]?.status).toBe('ambiguous_multiple_matches');

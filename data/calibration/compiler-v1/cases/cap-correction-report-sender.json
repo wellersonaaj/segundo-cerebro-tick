@@ -1,0 +1,61 @@
+{
+  "scenario_id": "cap-correction-report-sender",
+  "category": "correction_document_sender",
+  "fixture_origin": "captured",
+  "raw_content": "Chris enviou o relatório trimestral.\n\n[CORREÇÃO] O relatório foi enviado por Dana Silva, não Chris.",
+  "extractor_output": {
+    "schema_version": "1.3",
+    "inbox_item_id": "00000000-0000-4000-8000-000000000026",
+    "events": [
+      {
+        "event_type": "document_sent",
+        "description": "Chris enviou o relatório trimestral",
+        "occurred_at": null,
+        "source_excerpt": "Chris enviou",
+        "confidence": 0.85,
+        "entity_names": [
+          "Chris"
+        ]
+      }
+    ],
+    "entities": [
+      {
+        "name": "Chris Oliveira",
+        "entity_type": "person",
+        "source_excerpt": "Chris Oliveira",
+        "confidence": 0.9,
+        "aliases": []
+      },
+      {
+        "name": "Dana Silva",
+        "entity_type": "person",
+        "source_excerpt": "Dana Silva",
+        "confidence": 0.9,
+        "aliases": []
+      }
+    ],
+    "assertions": [],
+    "tasks": [],
+    "clarification_requests": [],
+    "requires_review": false,
+    "review_reasons": [],
+    "processing_notes": []
+  },
+  "expected": {
+    "must_not_have": {
+      "event_descriptions": [
+        "Chris enviou"
+      ]
+    },
+    "must_have": {
+      "entities": [
+        "Dana Silva"
+      ]
+    }
+  },
+  "source_mode": "conversational",
+  "received_at": "2026-06-01T12:00:00-03:00",
+  "timezone": "America/Sao_Paulo",
+  "extractor_version": "extractor-v1.3",
+  "captured_at": "2026-06-02T12:00:00Z"
+}

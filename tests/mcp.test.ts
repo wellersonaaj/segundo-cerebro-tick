@@ -46,15 +46,7 @@ describe('MCP tools', () => {
           created_at: '',
           updated_at: '',
         },
-        aliases: [
-          {
-            id: 'a1',
-            entity_id: 'e1',
-            alias: 'Genius',
-            normalized_alias: 'genius',
-            created_at: '',
-          },
-        ],
+        aliases: ['Genius'],
         events: [],
         open_tasks: [],
       })),

@@ -1,0 +1,9 @@
+{
+  "scenario_id": "v14-ctx-complete-unique",
+  "regime": "incremental_single",
+  "ingestion_context_id": "cobrar_fornecedor",
+  "fixture_origin": "synthetic",
+  "source_channel": "calibration",
+  "source_mode": "conversational",
+  "raw_content": "[SOURCE_BLOCK:raw]\nPode marcar como concluído o cobrar fornecedor."
+}

@@ -1,0 +1,10 @@
+{
+  "scenario_id": "v14-ctx-due-date-ambiguous",
+  "regime": "incremental_ambiguous",
+  "ingestion_context_id": "two_contract_reviews",
+  "source_metadata": { "thread_reference": "thread-reviews" },
+  "fixture_origin": "synthetic",
+  "source_channel": "calibration",
+  "source_mode": "conversational",
+  "raw_content": "[SOURCE_BLOCK:raw]\nO prazo da revisão mudou para sexta."
+}

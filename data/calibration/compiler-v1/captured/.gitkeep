@@ -1,0 +1,2 @@
+# Capturas live promovidas manualmente via `npm run promote:live-captures`.
+# Outputs brutos ficam em artifacts/calibration/live-captures/ (gitignored).

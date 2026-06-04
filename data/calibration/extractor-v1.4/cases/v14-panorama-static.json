@@ -1,0 +1,8 @@
+{
+  "scenario_id": "v14-panorama-static",
+  "category": "panorama_static",
+  "fixture_origin": "synthetic",
+  "source_channel": "calibration",
+  "source_mode": "passive",
+  "raw_content": "[SOURCE_BLOCK:raw]\nPanorama: Alex Costa (Ace), Dana Silva (Dee), Chris Oliveira (Cri)."
+}

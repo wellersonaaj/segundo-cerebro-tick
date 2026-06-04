@@ -1,0 +1,38 @@
+{
+  "scenario_id": "syn-fact-vs-hypothesis",
+  "category": "fact_vs_hypothesis",
+  "fixture_origin": "synthetic",
+  "raw_content": "Acho que o deploy pode atrasar.",
+  "extractor_output": {
+    "schema_version": "1.3",
+    "inbox_item_id": "00000000-0000-4000-8000-000000000008",
+    "events": [],
+    "entities": [],
+    "assertions": [
+      {
+        "assertion_type": "hypothesis",
+        "content": "deploy pode atrasar",
+        "status": "unverified",
+        "source_excerpt": "Acho",
+        "confidence": 0.7
+      }
+    ],
+    "tasks": [],
+    "clarification_requests": [],
+    "requires_review": false,
+    "review_reasons": [],
+    "processing_notes": []
+  },
+  "expected": {
+    "must_have": {
+      "assertions": [
+        "atrasar"
+      ]
+    }
+  },
+  "source_mode": "conversational",
+  "received_at": "2026-06-01T12:00:00-03:00",
+  "timezone": "America/Sao_Paulo",
+  "extractor_version": "extractor-v1.3",
+  "captured_at": "2026-06-02T12:00:00Z"
+}

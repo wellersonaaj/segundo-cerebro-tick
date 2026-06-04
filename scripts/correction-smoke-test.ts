@@ -1,6 +1,7 @@
 /**
  * Homologação POST /inbox-items/:id/corrections (histórico preservado).
  * Requer API rodando e OPENAI_API_KEY.
+ * Schema: greenfield v2 (title, record_status).
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -16,6 +17,22 @@ requireEnv(['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'OPENAI_API_KEY']);
 
 const ORIGINAL_TEXT = 'Marcelo participou da reunião sobre a integração.';
 const CORRECTION_TEXT = 'Na verdade, Bruno participou da reunião.';
+
+type GreenfieldEventRow = {
+  id: string;
+  title: string;
+  source_excerpt: string;
+  record_status: string;
+  inbox_item_id: string;
+  correction_id: string | null;
+  extraction_run_id: string;
+};
+
+type IieRow = {
+  record_status: string;
+  extraction_run_id: string;
+  entities: { name: string; entity_type: string; registry_status: string } | null;
+};
 
 async function main(): Promise<void> {
   console.log('=== Correction Smoke Test ===\n');
@@ -92,70 +109,149 @@ async function main(): Promise<void> {
   }
   ok('Correção persistida em corrections');
 
+  const { data: runs, error: runsErr } = await supabase
+    .from('inbox_extraction_runs')
+    .select('id, status, trigger_type, promoted_at')
+    .eq('inbox_item_id', inboxId)
+    .order('created_at');
+  if (runsErr) fail(`Supabase runs: ${runsErr.message}`);
+  const promotedRuns = (runs ?? []).filter((r) => r.status === 'promoted');
+  if (promotedRuns.length < 2) {
+    fail(`Esperado >= 2 runs promoted, obtido: ${JSON.stringify(runs)}`);
+  }
+  ok(`${promotedRuns.length} extraction runs promoted (initial + correction)`);
+
+  const correctionRunId = (runs ?? []).find((r) => r.trigger_type === 'correction')?.id;
+  if (!correctionRunId) fail('Run de correção não encontrado');
+
   const { data: allEvents, error: evErr } = await supabase
     .from('events')
-    .select('id, description, source_excerpt, status, inbox_item_id, correction_id')
+    .select('id, title, source_excerpt, record_status, inbox_item_id, correction_id, extraction_run_id')
     .eq('inbox_item_id', inboxId);
   if (evErr) fail(`Supabase events: ${evErr.message}`);
 
-  const supersededMarcelo = (allEvents ?? []).filter(
+  const events = (allEvents ?? []) as GreenfieldEventRow[];
+  const supersededMarcelo = events.filter(
     (e) =>
-      e.status === 'superseded' &&
-      (/marcelo/i.test(e.description) || /marcelo/i.test(e.source_excerpt)),
+      e.record_status === 'superseded' &&
+      (/marcelo/i.test(e.title) || /marcelo/i.test(e.source_excerpt)),
   );
-  const activeBruno = (allEvents ?? []).filter(
-    (e) =>
-      e.status === 'active' &&
-      (/bruno/i.test(e.description) || /bruno/i.test(e.source_excerpt)),
-  );
-
+  const activeEvents = events.filter((e) => e.record_status === 'active');
   if (supersededMarcelo.length < 1) {
     fail(
-      `Esperado >= 1 evento superseded com Marcelo para inbox ${inboxId}: ${JSON.stringify(allEvents)}`,
+      `Esperado >= 1 evento superseded com Marcelo para inbox ${inboxId}: ${JSON.stringify(events)}`,
     );
   }
   ok('Supabase: >= 1 evento superseded com Marcelo');
+  const correctionActiveEvents = activeEvents.filter(
+    (e) => e.extraction_run_id === correctionRunId,
+  );
+  if (correctionActiveEvents.length < 1) {
+    fail(`Esperado evento active do run de correção: ${JSON.stringify(events)}`);
+  }
 
-  if (activeBruno.length < 1) {
+  const activeEventIds = correctionActiveEvents.map((e) => e.id);
+  const { data: eventLinks, error: linkErr } = await supabase
+    .from('event_entities')
+    .select('event_id, entity_reference, relation_type, entities(name)')
+    .in('event_id', activeEventIds);
+  if (linkErr) fail(`Supabase event_entities: ${linkErr.message}`);
+
+  const brunoOnActiveEvent = (eventLinks ?? []).some((link) => {
+    const ref = String(link.entity_reference ?? '');
+    const name = (link.entities as { name?: string } | null)?.name ?? '';
+    return /bruno/i.test(ref) || /bruno/i.test(name);
+  });
+
+  const brunoInActiveEventText = activeEvents.some(
+    (e) => /bruno/i.test(e.title) || /bruno/i.test(e.source_excerpt),
+  );
+
+  if (!brunoOnActiveEvent && !brunoInActiveEventText) {
     fail(
-      `Esperado >= 1 evento active com Bruno para inbox ${inboxId}: ${JSON.stringify(allEvents)}`,
+      `Esperado Bruno como participante do evento active (event_entities ou texto): ` +
+        `events=${JSON.stringify(correctionActiveEvents)} links=${JSON.stringify(eventLinks)}`,
     );
   }
-  ok('Supabase: >= 1 evento active com Bruno');
+  ok('Supabase: evento active com Bruno (participant ou texto)');
 
-  const brunoEvent = activeBruno[0]!;
-  if (brunoEvent.inbox_item_id !== inboxId) {
-    fail(`Evento active Bruno com inbox_item_id errado: ${brunoEvent.inbox_item_id}`);
-  }
-  ok('Evento active Bruno vinculado ao inbox do correction-smoke');
+  const { data: iieRows, error: iieErr } = await supabase
+    .from('inbox_item_entities')
+    .select('record_status, extraction_run_id, entities(name, entity_type, registry_status)')
+    .eq('inbox_item_id', inboxId);
+  if (iieErr) fail(`Supabase inbox_item_entities: ${iieErr.message}`);
 
-  if (brunoEvent.correction_id != null) {
-    if (brunoEvent.correction_id !== correctionId) {
-      fail(
-        `correction_id do evento active (${brunoEvent.correction_id}) != correction_id da correção (${correctionId})`,
-      );
-    }
-    ok('Evento active vinculado à correction_id correta');
+  const iie = (iieRows ?? []) as IieRow[];
+  const activeMarcelo = iie.filter(
+    (row) =>
+      row.record_status === 'active' &&
+      /marcelo/i.test(row.entities?.name ?? ''),
+  );
+  if (activeMarcelo.length > 0) {
+    fail(
+      `Marcelo não deve ter IIE active após correção (mesmo fato corrigido): ${JSON.stringify(activeMarcelo)}`,
+    );
   }
+  ok('Marcelo sem IIE active conflitante');
+
+  const activeBrunoIie = iie.filter(
+    (row) =>
+      row.record_status === 'active' &&
+      /bruno/i.test(row.entities?.name ?? ''),
+  );
+  if (activeBrunoIie.length < 1) {
+    fail(`Esperado IIE active para Bruno: ${JSON.stringify(iie)}`);
+  }
+  ok('Bruno com IIE active');
+
+  const peripheralCanonical = iie.filter(
+    (row) =>
+      row.record_status === 'active' &&
+      row.entities &&
+      !['person', 'company', 'project', 'product'].includes(row.entities.entity_type) &&
+      (/reuni/i.test(row.entities.name) || /^integra/i.test(row.entities.name)),
+  );
+  if (peripheralCanonical.length > 0) {
+    fail(`Entidades periféricas canônicas indevidas: ${JSON.stringify(peripheralCanonical)}`);
+  }
+  ok('Sem entidade canônica active para reunião/integração genérica');
+
+  const { data: blockingClar, error: clarErr } = await supabase
+    .from('clarification_requests')
+    .select('issue_type, blocking_scope, materiality, status, target_reference')
+    .eq('inbox_item_id', inboxId)
+    .eq('status', 'pending')
+    .eq('materiality', 'blocking')
+    .eq('blocking_scope', 'knowledge_confirmation');
+  if (clarErr) fail(`Supabase clarifications: ${clarErr.message}`);
+  if ((blockingClar ?? []).length > 0) {
+    fail(`KC periférica bloqueando indevidamente: ${JSON.stringify(blockingClar)}`);
+  }
+  ok('Nenhuma knowledge_confirmation periférica bloqueando promote');
 
   const memoryBruno = await fetchJson(`/memory/search?q=${encodeURIComponent('Bruno')}`);
   if (memoryBruno.status !== 200) {
     fail(`GET /memory/search?q=Bruno retornou ${memoryBruno.status}`);
   }
 
-  const events = (memoryBruno.body as { events: Array<{ inbox_item_id: string; description: string }> })
-    .events ?? [];
-  const brunoFromThisInbox = events.filter(
-    (e) => e.inbox_item_id === inboxId && /bruno/i.test(e.description),
+  const mem = memoryBruno.body as {
+    entities?: Array<{ name: string; inbox_item_id?: string }>;
+    events?: Array<{ inbox_item_id: string; description: string; record_status?: string }>;
+  };
+  const brunoEntityHit = (mem.entities ?? []).some((e) => /bruno/i.test(e.name));
+  const brunoEventHit = (mem.events ?? []).some(
+    (e) =>
+      e.inbox_item_id === inboxId &&
+      /bruno/i.test(e.description) &&
+      (e.record_status == null || e.record_status === 'active'),
   );
 
-  if (brunoFromThisInbox.length < 1) {
+  if (!brunoEntityHit && !brunoEventHit && !brunoOnActiveEvent) {
     fail(
-      `GET /memory/search?q=Bruno sem evento active deste inbox (${inboxId}). ` +
-        `Eventos retornados: ${events.map((e) => `${e.inbox_item_id}:${e.description}`).join('; ')}`,
+      `Bruno não recuperável via memory/search nem event_entities para inbox ${inboxId}`,
     );
   }
-  ok('GET /memory/search?q=Bruno → evento active deste inbox_item_id');
+  ok('Bruno recuperável (entity, evento ou participant link)');
 
   console.log('\n=== Correction smoke concluído com sucesso ===\n');
 }

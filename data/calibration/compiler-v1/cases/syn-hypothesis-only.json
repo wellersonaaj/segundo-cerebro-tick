@@ -1,0 +1,51 @@
+{
+  "scenario_id": "syn-hypothesis-only",
+  "category": "fact_vs_hypothesis",
+  "fixture_origin": "synthetic",
+  "raw_content": "Talvez a integração atrase.",
+  "extractor_output": {
+    "schema_version": "1.3",
+    "inbox_item_id": "00000000-0000-4000-8000-000000000029",
+    "events": [],
+    "entities": [
+      {
+        "name": "integração",
+        "entity_type": "topic",
+        "source_excerpt": "integração",
+        "confidence": 0.5,
+        "aliases": []
+      }
+    ],
+    "assertions": [
+      {
+        "assertion_type": "hypothesis",
+        "content": "integração atrase",
+        "status": "unverified",
+        "source_excerpt": "Talvez",
+        "confidence": 0.6
+      }
+    ],
+    "tasks": [],
+    "clarification_requests": [],
+    "requires_review": false,
+    "review_reasons": [],
+    "processing_notes": []
+  },
+  "expected": {
+    "must_not_have": {
+      "entities": [
+        "integração"
+      ]
+    },
+    "must_have": {
+      "assertions": [
+        "atrase"
+      ]
+    }
+  },
+  "source_mode": "conversational",
+  "received_at": "2026-06-01T12:00:00-03:00",
+  "timezone": "America/Sao_Paulo",
+  "extractor_version": "extractor-v1.3",
+  "captured_at": "2026-06-02T12:00:00Z"
+}

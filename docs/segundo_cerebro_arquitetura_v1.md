@@ -1191,3 +1191,14 @@ Critério de conclusão:
 > Usar diariamente.  
 > Observar erros reais.  
 > Adicionar complexidade somente quando um problema concreto justificar.
+
+---
+
+# 23. Suplemento MVP — aliases e bootstrap (2026-05-31)
+
+Decisões implementadas no código (detalhes em `docs/decisoes-arquiteturais.md`):
+
+- **Aliases:** `entity_aliases` é a única fonte persistida; REST/MCP calculam aliases por join.
+- **Bootstrap:** `source_channel = bootstrap` dispara linking amplo no evento principal escolhido deterministicamente (não depende só de `document_snapshot`).
+- **Cotidiano:** mensagens com outros canais mantêm linking contextual por evento.
+- **Assertions:** sem teto artificial de 15; omissões vêm do modelo; revisão manual via `bootstrap_assertion_completeness_review`.

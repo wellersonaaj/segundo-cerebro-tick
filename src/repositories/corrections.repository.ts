@@ -23,4 +23,19 @@ export class CorrectionsRepository {
     if (error) throw new Error(`corrections.listByInboxItem: ${error.message}`);
     return (data ?? []) as Correction[];
   }
+
+  async inboxIdsWithCorrections(inboxItemIds: string[]): Promise<Set<string>> {
+    const ids = new Set<string>();
+    if (!inboxItemIds.length) return ids;
+
+    const { data, error } = await this.db
+      .from('corrections')
+      .select('inbox_item_id')
+      .in('inbox_item_id', inboxItemIds);
+    if (error) throw new Error(`corrections.inboxIdsWithCorrections: ${error.message}`);
+    for (const row of data ?? []) {
+      ids.add(row.inbox_item_id as string);
+    }
+    return ids;
+  }
 }

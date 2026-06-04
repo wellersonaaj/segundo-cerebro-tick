@@ -42,10 +42,14 @@ export async function fetchJson(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
+    const hasBody = init?.body != null && init.body !== '';
     const res = await fetch(`${BASE}${path}`, {
       ...init,
       signal: controller.signal,
-      headers: { 'Content-Type': 'application/json', ...init?.headers },
+      headers: {
+        ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
+        ...init?.headers,
+      },
     });
     let body: unknown;
     try {
