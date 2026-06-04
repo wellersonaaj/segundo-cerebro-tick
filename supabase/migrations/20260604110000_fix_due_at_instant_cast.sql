@@ -1,6 +1,5 @@
--- persist_extraction_candidates
--- Single RPC that writes all candidate artifacts in one atomic transaction.
--- Replaces the multi-call app-side loop in PersistenceV2Service.persistCandidates.
+-- Bug 2: reject non-ISO due_at_instant (e.g. "segunda-feira") before timestamptz cast.
+-- Replaces persist_extraction_candidates; same as 20260604000000 with ISO regex on due_at_instant.
 
 create or replace function persist_extraction_candidates(
   p_inbox_item_id uuid,

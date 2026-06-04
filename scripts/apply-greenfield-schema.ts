@@ -27,6 +27,9 @@ const MIGRATIONS = [
   '20260603130000_s2_external_action_no_promote_block.sql',
   '20260604000001_persist_rpc_indexes.sql',
   '20260604000000_persist_extraction_candidates.sql',
+  '20260604110000_fix_due_at_instant_cast.sql',
+  '20260604120000_cleanup_duplicate_entities.sql',
+  '20260604130000_persist_entity_upsert_do_nothing.sql',
 ] as const;
 
 const MIGRATION_LABELS: Record<(typeof MIGRATIONS)[number], string> = {
@@ -37,6 +40,9 @@ const MIGRATION_LABELS: Record<(typeof MIGRATIONS)[number], string> = {
   '20260603130000_s2_external_action_no_promote_block.sql': 'S2 external_action no promote block applied',
   '20260604000001_persist_rpc_indexes.sql': 'persist RPC indexes applied',
   '20260604000000_persist_extraction_candidates.sql': 'persist_extraction_candidates RPC applied',
+  '20260604110000_fix_due_at_instant_cast.sql': 'persist_extraction_candidates due_at_instant ISO guard applied',
+  '20260604120000_cleanup_duplicate_entities.sql': 'cleanup duplicate rejected entities (smoke residue)',
+  '20260604130000_persist_entity_upsert_do_nothing.sql': 'persist entity upsert do nothing (race hygiene)',
 };
 
 const DROP_GREENFIELD_OBJECTS = `

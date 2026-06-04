@@ -23,6 +23,7 @@
     "db:apply-migrations": "tsx scripts/apply-pending-migrations.ts",
     "db:apply-greenfield-schema": "tsx scripts/apply-greenfield-schema.ts",
     "db:apply-incremental-migrations": "tsx scripts/apply-incremental-migrations.ts",
+    "db:investigate-bug1": "tsx scripts/investigate-bug1-entity-aliases.ts",
     "reset:test-data": "tsx scripts/reset-test-data.ts",
     "import:bootstrap": "tsx scripts/import-bootstrap-memory.ts",
     "test:bootstrap:smoke": "tsx scripts/bootstrap-smoke-test.ts",

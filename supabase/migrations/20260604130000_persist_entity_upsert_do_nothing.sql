@@ -1,6 +1,6 @@
--- persist_extraction_candidates
--- Single RPC that writes all candidate artifacts in one atomic transaction.
--- Replaces the multi-call app-side loop in PersistenceV2Service.persistCandidates.
+-- 20260604130000_persist_entity_upsert_do_nothing.sql
+-- Entity upsert: do update set updated_at → do nothing (race hygiene).
+-- Keeps due_at_instant ISO regex from 20260604110000_fix_due_at_instant_cast.sql.
 
 create or replace function persist_extraction_candidates(
   p_inbox_item_id uuid,
@@ -38,7 +38,7 @@ declare
   v_cl_id uuid;
   v_result jsonb;
 begin
-  -- 1. Upsert entities
+  -- 1. Upsert entities (do nothing on conflict — avoids parallel touch noise)
   for v_entity in select * from jsonb_to_recordset(p_entities) as x(
     name text, entity_type text, normalized_name text
   )
@@ -46,7 +46,7 @@ begin
     insert into entities (name, canonical_name, entity_type, normalized_name, registry_status, created_by_extraction_run_id)
     values (v_entity.name, v_entity.name, v_entity.entity_type, v_entity.normalized_name, 'candidate', p_extraction_run_id)
     on conflict (normalized_name) where registry_status in ('active', 'candidate')
-    do update set updated_at = now();
+    do nothing;
   end loop;
 
   -- Build entity_id lookup map for every entity name referenced in the payload (incl. registry active)

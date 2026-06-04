@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const PERSIST_SQL = readFileSync(
-  join(process.cwd(), 'supabase/migrations/20260604000000_persist_extraction_candidates.sql'),
+  join(process.cwd(), 'supabase/migrations/20260604130000_persist_entity_upsert_do_nothing.sql'),
   'utf8',
 );
 
@@ -33,10 +33,19 @@ describe('persist_extraction_candidates static validation', () => {
     expect(PERSIST_SQL).toMatch(
       /on conflict \(normalized_name\) where registry_status in \('active', 'candidate'\)/i,
     );
+    expect(PERSIST_SQL).toMatch(
+      /on conflict \(normalized_name\) where registry_status in \('active', 'candidate'\)\s+do nothing/i,
+    );
   });
 
   it('clarifications normalize nullable target_reference', () => {
     expect(PERSIST_SQL).toContain("normalize_text(coalesce(v_cl.target_reference, ''))");
+  });
+
+  it('due_at_instant uses ISO date prefix guard like occurred_at', () => {
+    expect(PERSIST_SQL).toMatch(
+      /v_tm\.due_at_instant ~ '\^\[0-9\]\{4\}-\[0-9\]\{2\}-\[0-9\]\{2\}'/,
+    );
   });
 
   it('entity_id map resolves names from aliases and related payloads', () => {
