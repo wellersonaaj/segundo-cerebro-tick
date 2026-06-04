@@ -7,6 +7,7 @@ import {
   stripNewCapturePrefix,
 } from '../telegram/parse-clarification-answer.js';
 import type { ParsedTelegramCapture } from '../telegram/parse-update.js';
+import { buildTelegramSourceReference } from '../telegram/telegram-source-reference.js';
 import { createTelegramDelivery } from './assistant-delivery.js';
 import type { AssistantTurnService } from './assistant-turn.service.js';
 import { AssistantTurnService as AssistantTurnServiceClass } from './assistant-turn.service.js';
@@ -76,7 +77,7 @@ export class TelegramInboxService {
       channel: 'telegram',
       received_at: capture.receivedAt,
       timezone: config.defaultTimezone,
-      source_reference: `telegram:chat:${capture.chatId}:message:${capture.messageId}`,
+      source_reference: buildTelegramSourceReference(capture.chatId, capture.messageId),
       metadata: buildTelegramInboxMetadata(
         { ...capture, text: captureText },
         config.senderEntityReference,

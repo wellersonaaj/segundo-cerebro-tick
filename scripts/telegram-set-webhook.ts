@@ -1,5 +1,5 @@
 /**
- * Registra o webhook do bot no Telegram (URL aponta para o n8n ou endpoint público).
+ * Registra o webhook do bot no Telegram apontando para POST /webhooks/telegram desta API.
  * Uso: npm run telegram:set-webhook
  */
 
@@ -11,10 +11,20 @@ loadDotEnv();
 
 const config = requireTelegramConfig();
 
-console.log('Registrando webhook Telegram…');
+const expectedPath = '/webhooks/telegram';
+if (!config.webhookUrl.includes(expectedPath)) {
+  console.warn('');
+  console.warn(`AVISO: TELEGRAM_WEBHOOK_URL deve apontar para ${expectedPath} nesta API.`);
+  console.warn(`  Valor atual: ${config.webhookUrl}`);
+  console.warn(`  Exemplo:     https://<sua-app>.up.railway.app/webhooks/telegram`);
+  console.warn('');
+}
+
+console.log('Registrando webhook Telegram (direto na API)…');
 console.log('  URL:', config.webhookUrl);
 console.log('  Usuário permitido (app):', config.allowedUserId);
 
 await setTelegramWebhook(config);
 
-console.log('OK: setWebhook concluído. Encaminhe o payload para POST /webhooks/telegram na API com o mesmo secret.');
+console.log('OK: setWebhook concluído.');
+console.log('Fluxo: Telegram → POST /webhooks/telegram → assistente + Supabase + resposta no chat.');

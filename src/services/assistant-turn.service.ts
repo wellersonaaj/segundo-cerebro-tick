@@ -103,24 +103,19 @@ export class AssistantTurnService {
 
   private async runCapturePipeline(turnId: string, input: StartCaptureInput): Promise<void> {
     try {
-      let inboxItem = input.source_reference
-        ? await this.inboxRepo.findBySourceReference(input.source_reference)
-        : null;
+      const inboxItem = await this.resolveOrCreateInbox(turnId, input);
 
-      if (!inboxItem) {
-        const metadata = withAssistantTurnMetadata(input.metadata ?? {}, {
-          thread_id: input.thread_id,
-          active_turn_id: turnId,
+      if (inboxItem.duplicate_delivery) {
+        log('info', 'assistant_turn', {
+          step: 'duplicate_telegram_delivery_skipped',
+          turn_id: turnId,
+          inbox_item_id: inboxItem.id,
         });
-        inboxItem = await this.inboxRepo.create({
-          raw_content: input.text,
-          source_channel: input.channel === 'telegram' ? 'telegram' : 'api',
-          source_mode: 'conversational',
-          received_at: input.received_at,
-          timezone: input.timezone,
-          source_reference: input.source_reference ?? null,
-          metadata,
+        setAssistantTurnStatus(turnId, 'completed', {
+          inbox_item_id: inboxItem.id,
+          follow_up_message: null,
         });
+        return;
       }
 
       const pipelineResult = await this.v14Process!.processById(inboxItem.id);
@@ -239,6 +234,44 @@ export class AssistantTurnService {
         }),
       );
     }
+  }
+
+  private async resolveOrCreateInbox(
+    turnId: string,
+    input: StartCaptureInput,
+  ): Promise<{ id: string; duplicate_delivery?: boolean }> {
+    if (input.source_reference) {
+      const existing = await this.inboxRepo.findBySourceReference(input.source_reference);
+      if (existing) {
+        const sameContent = existing.raw_content.trim() === input.text.trim();
+        if (sameContent && existing.processing_status === 'completed') {
+          return { id: existing.id, duplicate_delivery: true };
+        }
+        if (!sameContent) {
+          log('warn', 'assistant_turn', {
+            step: 'source_reference_content_mismatch',
+            source_reference: input.source_reference,
+            inbox_item_id: existing.id,
+          });
+        }
+        return { id: existing.id };
+      }
+    }
+
+    const metadata = withAssistantTurnMetadata(input.metadata ?? {}, {
+      thread_id: input.thread_id,
+      active_turn_id: turnId,
+    });
+    const created = await this.inboxRepo.create({
+      raw_content: input.text,
+      source_channel: input.channel === 'telegram' ? 'telegram' : 'api',
+      source_mode: 'conversational',
+      received_at: input.received_at,
+      timezone: input.timezone,
+      source_reference: input.source_reference ?? null,
+      metadata,
+    });
+    return { id: created.id };
   }
 
   private async markActiveClarification(

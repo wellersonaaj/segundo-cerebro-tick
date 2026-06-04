@@ -56,11 +56,12 @@ describe('parseTelegramWebhookBody reply_to', () => {
     }
   });
 
-  it('parses n8n forward with reply_to_message_id', () => {
+  it('parses simplified forward with reply_to_message_id', () => {
     const parsed = parseTelegramWebhookBody({
       text: '2',
       user_id: 5991664193,
       chat_id: 5991664193,
+      message_id: 78,
       reply_to_message_id: 77,
     });
     expect(parsed.kind).toBe('capture');

@@ -33,15 +33,19 @@ Ver `.env.example`:
 | `TELEGRAM_BOT_TOKEN` | Token do BotFather (interface Telegram) |
 | `TELEGRAM_ALLOWED_USER_ID` | ID numérico do usuário autorizado a capturar |
 | `TELEGRAM_WEBHOOK_SECRET` | `secret_token` do webhook (header `X-Telegram-Bot-Api-Secret-Token`) |
-| `TELEGRAM_WEBHOOK_URL` | URL pública registrada no Telegram (ex.: webhook do n8n) |
+| `TELEGRAM_WEBHOOK_URL` | URL pública registrada no Telegram: `https://<sua-api>/webhooks/telegram` |
 | `TELEGRAM_DEFAULT_TIMEZONE` | Fuso nas capturas via Telegram (padrão: `America/Sao_Paulo`) |
+| `TELEGRAM_SENDER_ENTITY_REFERENCE` | Nome canônico do remetente (resolve "eu" nas capturas) |
 
-### Telegram (n8n → API)
+### Telegram (webhook direto na API)
 
-1. Preencha as variáveis `TELEGRAM_*` no `.env`.
-2. `npm run telegram:set-webhook` — registra no Telegram a URL do n8n com o secret.
-3. No n8n, após o trigger Telegram, faça HTTP POST para `http://<sua-api>/webhooks/telegram` com header `X-Telegram-Bot-Api-Secret-Token: <TELEGRAM_WEBHOOK_SECRET>` e corpo igual ao update do Telegram (ou `{ "text": "...", "user_id": 5991664193 }`).
-4. A API processa como `source_channel=telegram` e responde no chat com um resumo da captura.
+1. Preencha `TELEGRAM_*` no `.env` / Railway (incl. greenfield: `GREENFIELD_SCHEMA`, `EXTRACTOR_V14_SHADOW_ENABLED`, `PERSIST_COMPILED_MEMORY_V2`).
+2. Defina `TELEGRAM_WEBHOOK_URL=https://<sua-api>/webhooks/telegram`.
+3. `npm run telegram:set-webhook` — registra no Telegram o endpoint desta API com o secret.
+4. Desative workflows n8n antigos (INSERT + `/internal/.../process`) se ainda existirem.
+5. Envie uma mensagem no bot: ack imediato + follow-up após o pipeline; audit em `/audit`.
+
+Fluxo: `Telegram → POST /webhooks/telegram → AssistantTurnService → Supabase → resposta no chat`.
 
 ## Migrations
 

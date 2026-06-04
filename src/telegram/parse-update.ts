@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isValidTelegramMessageId } from './telegram-source-reference.js';
 
 const telegramUserSchema = z.object({
   id: z.number().int(),
@@ -29,12 +30,12 @@ const telegramUpdateSchema = z.object({
   edited_message: telegramMessageSchema.optional(),
 });
 
-/** Payload simplificado que o n8n pode encaminhar após o trigger do Telegram. */
-const n8nForwardSchema = z.object({
+/** Optional simplified payload (tests/tools); requires message_id. */
+const simplifiedForwardSchema = z.object({
   text: z.string().min(1),
   user_id: z.coerce.number().int().positive(),
   chat_id: z.coerce.number().int().positive().optional(),
-  message_id: z.coerce.number().int().positive().optional(),
+  message_id: z.coerce.number().int().positive(),
   date: z.coerce.number().int().positive().optional(),
   reply_to_message_id: z.coerce.number().int().positive().optional(),
 });
@@ -46,6 +47,7 @@ export interface ParsedTelegramCapture {
   text: string;
   receivedAt: string;
   replyToMessageId?: number;
+  updateId?: number;
 }
 
 export type ParseTelegramUpdateResult =
@@ -57,12 +59,18 @@ function unixToIso(dateUnix: number): string {
   return new Date(dateUnix * 1000).toISOString();
 }
 
-function fromMessage(message: z.infer<typeof telegramMessageSchema>): ParseTelegramUpdateResult {
+function fromMessage(
+  message: z.infer<typeof telegramMessageSchema>,
+  updateId?: number,
+): ParseTelegramUpdateResult {
   const text = message.text?.trim();
   if (!text) {
     return { kind: 'ignored', reason: 'message_without_text' };
   }
   const userId = message.from?.id ?? message.chat.id;
+  if (!isValidTelegramMessageId(message.message_id)) {
+    return { kind: 'invalid', error: 'message_id_required' };
+  }
   return {
     kind: 'capture',
     capture: {
@@ -72,36 +80,41 @@ function fromMessage(message: z.infer<typeof telegramMessageSchema>): ParseTeleg
       text,
       receivedAt: unixToIso(message.date),
       replyToMessageId: message.reply_to_message?.message_id,
+      updateId,
     },
   };
 }
 
 export function parseTelegramWebhookBody(body: unknown): ParseTelegramUpdateResult {
-  const n8n = n8nForwardSchema.safeParse(body);
-  if (n8n.success) {
-    const dateUnix = n8n.data.date ?? Math.floor(Date.now() / 1000);
+  if (body != null && typeof body === 'object' && !Array.isArray(body)) {
+    const record = body as Record<string, unknown>;
+    if ('message' in record || 'edited_message' in record) {
+      const update = telegramUpdateSchema.safeParse(body);
+      if (update.success) {
+        const message = update.data.message ?? update.data.edited_message;
+        if (!message) {
+          return { kind: 'ignored', reason: 'no_message' };
+        }
+        return fromMessage(message, update.data.update_id);
+      }
+    }
+  }
+
+  const simplified = simplifiedForwardSchema.safeParse(body);
+  if (simplified.success) {
+    const dateUnix = simplified.data.date ?? Math.floor(Date.now() / 1000);
     return {
       kind: 'capture',
       capture: {
-        userId: n8n.data.user_id,
-        chatId: n8n.data.chat_id ?? n8n.data.user_id,
-        messageId: n8n.data.message_id ?? 0,
-        text: n8n.data.text.trim(),
+        userId: simplified.data.user_id,
+        chatId: simplified.data.chat_id ?? simplified.data.user_id,
+        messageId: simplified.data.message_id,
+        text: simplified.data.text.trim(),
         receivedAt: unixToIso(dateUnix),
-        replyToMessageId: n8n.data.reply_to_message_id,
+        replyToMessageId: simplified.data.reply_to_message_id,
       },
     };
   }
 
-  const update = telegramUpdateSchema.safeParse(body);
-  if (!update.success) {
-    return { kind: 'invalid', error: 'unrecognized_payload' };
-  }
-
-  const message = update.data.message ?? update.data.edited_message;
-  if (!message) {
-    return { kind: 'ignored', reason: 'no_message' };
-  }
-
-  return fromMessage(message);
+  return { kind: 'invalid', error: 'unrecognized_payload' };
 }

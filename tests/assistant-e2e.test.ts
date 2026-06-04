@@ -120,6 +120,51 @@ describe('AssistantTurnService', () => {
     expect(deps.v14Process.processById).toHaveBeenCalled();
   });
 
+  it('skips duplicate telegram delivery for completed inbox', async () => {
+    Object.assign(process.env, GREENFIELD_ENV);
+    resetEnvCache();
+    const deps = createMockDeps();
+    const existingInbox = {
+      id: 'inbox-existing',
+      raw_content: 'mesma mensagem',
+      processing_status: 'completed',
+      metadata: {},
+    };
+    deps.inboxRepo.findBySourceReference = vi.fn(async () => existingInbox);
+
+    const service = new AssistantTurnService(
+      deps.inboxRepo as never,
+      deps.v14Process as never,
+      deps.clarificationsRepo as never,
+      deps.clarificationService,
+      deps.taskAuditRepo as never,
+      deps.runsV2Repo as never,
+    );
+
+    const sent: string[] = [];
+    await service.startCapture({
+      text: 'mesma mensagem',
+      thread_id: 'telegram:chat:123',
+      channel: 'telegram',
+      received_at: new Date().toISOString(),
+      timezone: 'America/Sao_Paulo',
+      source_reference: 'telegram:chat:123:message:99',
+      delivery: {
+        sendAck: async (msg) => sent.push(msg),
+        sendFollowUp: async (msg) => {
+          sent.push(msg);
+          return null;
+        },
+      },
+    });
+
+    await vi.waitFor(() => {
+      expect(deps.v14Process.processById).not.toHaveBeenCalled();
+    }, { timeout: 2000 });
+
+    expect(sent).toHaveLength(1);
+  });
+
   it('stores failed status when pipeline throws', async () => {
     Object.assign(process.env, GREENFIELD_ENV);
     resetEnvCache();
@@ -227,7 +272,9 @@ describe('Telegram webhook assistant flow', () => {
       },
     });
 
-    expect(res.statusCode).toBe(202);
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { accepted: boolean };
+    expect(body.accepted).toBe(true);
 
     await vi.waitFor(() => expect(sentMessages.length).toBeGreaterThanOrEqual(2), {
       timeout: 3000,

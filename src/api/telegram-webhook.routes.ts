@@ -59,38 +59,39 @@ export async function registerTelegramWebhookRoutes(
     }
 
     log('info', 'telegram_webhook', {
-      step: 'capture_start',
+      step: 'capture_accepted',
       chat_id: capture.chatId,
       message_id: capture.messageId,
+      update_id: capture.updateId,
     });
 
-    try {
-      const handled = await deps.telegramInbox.handleIncoming(capture);
-      if (handled.kind === 'clarification_resolved') {
-        return reply.send({
-          ok: true,
-          clarification_resolved: true,
+    reply.send({ ok: true, accepted: true });
+
+    void deps.telegramInbox
+      .handleIncoming(capture)
+      .then((handled) => {
+        log('info', 'telegram_webhook', {
+          step: 'capture_handled',
+          kind: handled.kind,
           turn_id: handled.turn_id,
-          inbox_item_id: handled.inbox_item_id,
-          answer: handled.answer,
+          chat_id: capture.chatId,
+          message_id: capture.messageId,
         });
-      }
-      return reply.status(202).send({
-        ok: true,
-        processing: true,
-        turn_id: handled.turn_id,
-        thread_id: handled.thread_id,
+      })
+      .catch(async (err) => {
+        const message = err instanceof Error ? err.message : String(err);
+        log('error', 'telegram_webhook', {
+          step: 'capture_failed',
+          error: message,
+          chat_id: capture.chatId,
+          message_id: capture.messageId,
+        });
+        await sendTelegramMessageSafe(
+          config,
+          capture.chatId,
+          'Não consegui processar esta mensagem. Tente de novo em instantes.',
+          { step: 'error_reply' },
+        );
       });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      log('error', 'telegram_webhook', { step: 'capture_failed', error: message });
-      await sendTelegramMessageSafe(
-        config,
-        capture.chatId,
-        'Não consegui processar esta mensagem. Tente de novo em instantes.',
-        { step: 'error_reply' },
-      );
-      return reply.status(500).send({ error: message });
-    }
   });
 }

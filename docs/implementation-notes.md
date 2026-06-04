@@ -108,20 +108,27 @@ Fluxo: `start_extraction_run` → extract → candidates → `promote_extraction
 
 Ver fotografia consolidada em [schema-current.md](./schema-current.md).
 
-## Checkpoint C — fluxo n8n + Telegram (preparação)
+## Checkpoint C — Telegram direto na API
 
-O processamento LLM **não** deve atrasar a confirmação HTTP ao Telegram. Ordem correta no n8n:
+O Telegram envia updates para `POST /webhooks/telegram` nesta API (sem n8n). O assistente responde no chat; o Supabase persiste via pipeline v1.4 greenfield.
 
 ```text
-Telegram → n8n
-→ Postgres INSERT inbox_item (processing_status = pending)
-→ Respond to Webhook HTTP 200        ← imediato, antes da LLM
-→ IF inserted = true
-→ POST /internal/inbox-items/{{ $json.id }}/process
-  (header X-Internal-Processing-Secret)
+Telegram Bot API (webhook)
+→ POST /webhooks/telegram (secret + allowed user)
+→ AssistantTurnService: ack imediato + pipeline async + follow-up
+→ inbox_items + promote
 ```
 
-O backend processa de forma assíncrona via endpoint interno; falhas de LLM retornam 500 no POST interno, sem impactar o 200 já enviado ao Telegram.
+Registro do webhook: `TELEGRAM_WEBHOOK_URL=https://<api>/webhooks/telegram` + `npm run telegram:set-webhook`.
+
+O endpoint interno `POST /internal/inbox-items/:id/process` permanece para smoke/reprocess manual, não para captura conversacional.
+
+Ordem de resposta HTTP ao Telegram:
+
+```text
+1. API responde 200 { ok: true, accepted: true } imediatamente
+2. ack + pipeline + follow-up rodam em background
+```
 
 ## Segurança mínima (revisão homologação)
 

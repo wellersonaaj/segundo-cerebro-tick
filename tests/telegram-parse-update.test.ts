@@ -20,15 +20,26 @@ describe('parseTelegramWebhookBody', () => {
     expect(result.capture.receivedAt).toBe('2023-11-14T22:13:20.000Z');
   });
 
-  it('parses n8n simplified forward payload', () => {
+  it('parses simplified forward payload with message_id', () => {
     const result = parseTelegramWebhookBody({
       text: 'Tarefa para o Nico',
       user_id: 5991664193,
+      message_id: 12,
       date: 1_700_000_100,
     });
     expect(result.kind).toBe('capture');
     if (result.kind !== 'capture') return;
     expect(result.capture.text).toBe('Tarefa para o Nico');
+    expect(result.capture.messageId).toBe(12);
+  });
+
+  it('rejects simplified payload without message_id', () => {
+    const result = parseTelegramWebhookBody({
+      text: 'Tarefa para o Nico',
+      user_id: 5991664193,
+      date: 1_700_000_100,
+    });
+    expect(result).toEqual({ kind: 'invalid', error: 'unrecognized_payload' });
   });
 
   it('ignores updates without text', () => {
