@@ -86,7 +86,7 @@ export function scanEnrichmentTriggers(
   for (const c of output.clarification_candidates) {
     if (
       (c.issue_type === 'ambiguous_date' ||
-        c.issue_type === 'missing_context' ||
+        c.issue_type === 'unclear_scope' ||
         c.issue_type === 'other') &&
       isProperNounLike(c.target_reference) &&
       c.blocking_scope === 'none'

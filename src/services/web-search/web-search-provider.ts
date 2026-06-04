@@ -1,4 +1,4 @@
-import type { WebSearchSnippet } from '../types/external-knowledge-enrichment.js';
+import type { WebSearchSnippet } from '../../types/external-knowledge-enrichment.js';
 
 export interface WebSearchProvider {
   search(query: string, limit?: number): Promise<WebSearchSnippet[]>;

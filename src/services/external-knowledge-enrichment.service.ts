@@ -3,15 +3,12 @@ import {
   EXTERNAL_KNOWLEDGE_ENRICHMENT_ID,
   EXTERNAL_KNOWLEDGE_ENRICHMENT_VERSION,
   type EnrichedFact,
+  type EnrichmentTrigger,
   type ExternalKnowledgeEnrichmentResult,
   type WebSearchSnippet,
 } from '../types/external-knowledge-enrichment.js';
 import { normalizeText } from '../utils/normalize.js';
-import {
-  buildSearchQueries,
-  scanEnrichmentTriggers,
-  type EnrichmentTrigger,
-} from './enrichment-trigger-scanner.js';
+import { buildSearchQueries, scanEnrichmentTriggers } from './enrichment-trigger-scanner.js';
 import type { WebSearchProvider } from './web-search/web-search-provider.js';
 
 const DATE_RANGE_RE =
