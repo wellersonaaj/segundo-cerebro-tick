@@ -6,17 +6,12 @@ import type {
   TaskSignalContextResolution,
 } from '../types/ingestion-context.js';
 import type { MemoryResolverResult } from '../services/reference-resolver.service.js';
-import type { ClarificationManagerV2Result } from '../services/clarification-manager-v2.service.js';
+import type { ClarificationManagerV2Result } from '../types/clarification-types.js';
 import { isMvpAutoRegistryEntityType, isMvpBlockedGenericEntityTerm } from '../config/mvp-registry-policy.js';
 import type { PersistenceV2Result } from '../types/domain-v2.js';
 import { normalizeText } from '../utils/normalize.js';
-import { EntitiesV2Repository } from '../repositories/v2/entities-v2.repository.js';
-import { EventsV2Repository } from '../repositories/v2/events-v2.repository.js';
-import { AssertionsV2Repository } from '../repositories/v2/assertions-v2.repository.js';
-import { TaskMutationsV2Repository } from '../repositories/v2/task-mutations-v2.repository.js';
-import { ClarificationsV2Repository } from '../repositories/v2/clarifications-v2.repository.js';
-import { InboxItemEntitiesV2Repository } from '../repositories/v2/inbox-item-entities-v2.repository.js';
-import { EntityAliasEvidencesV2Repository } from '../repositories/v2/entity-alias-evidences-v2.repository.js';
+import { ExtractionRunRpcV2Repository, type PersistExtractionCandidatesV2Input } from '../repositories/v2/extraction-run-rpc-v2.repository.js';
+import { dueAtColumnsFromTemporal } from '../types/domain-v2.js';
 
 export interface PersistCompiledMemoryV2Input {
   inboxItemId: string;
@@ -45,22 +40,10 @@ function asEntityType(value: string): EntityType {
 }
 
 export class PersistenceV2Service {
-  private readonly entitiesRepo: EntitiesV2Repository;
-  private readonly eventsRepo: EventsV2Repository;
-  private readonly assertionsRepo: AssertionsV2Repository;
-  private readonly taskMutationsRepo: TaskMutationsV2Repository;
-  private readonly clarificationsRepo: ClarificationsV2Repository;
-  private readonly inboxItemEntitiesRepo: InboxItemEntitiesV2Repository;
-  private readonly aliasEvidencesRepo: EntityAliasEvidencesV2Repository;
+  private readonly rpc: ExtractionRunRpcV2Repository;
 
   constructor(db: SupabaseClient) {
-    this.entitiesRepo = new EntitiesV2Repository(db);
-    this.eventsRepo = new EventsV2Repository(db);
-    this.assertionsRepo = new AssertionsV2Repository(db);
-    this.taskMutationsRepo = new TaskMutationsV2Repository(db);
-    this.clarificationsRepo = new ClarificationsV2Repository(db);
-    this.inboxItemEntitiesRepo = new InboxItemEntitiesV2Repository(db);
-    this.aliasEvidencesRepo = new EntityAliasEvidencesV2Repository(db);
+    this.rpc = new ExtractionRunRpcV2Repository(db);
   }
 
   async persistCandidates(input: PersistCompiledMemoryV2Input): Promise<PersistenceV2Result> {
@@ -73,6 +56,7 @@ export class PersistenceV2Service {
       correctionId,
     } = input;
 
+    // Entity ID resolution (read-only)
     const entityIds = new Map<string, string>();
 
     for (const ref of resolverResult.references) {
@@ -81,125 +65,117 @@ export class PersistenceV2Service {
       }
     }
 
+    // RPC payload: collect new entities
+    const rpcEntities: PersistExtractionCandidatesV2Input['entities'] = [];
+    const resolvedEntityNames = new Set<string>();
+
     for (const mention of compiled.resolvedEntities) {
-      if (!isMvpAutoRegistryEntityType(mention.suggestedEntityType)) {
-        continue;
-      }
-      if (isMvpBlockedGenericEntityTerm(mention.mentionText)) {
-        continue;
-      }
+      if (!isMvpAutoRegistryEntityType(mention.suggestedEntityType)) continue;
+      if (isMvpBlockedGenericEntityTerm(mention.mentionText)) continue;
+
       const key = normalizeText(mention.mentionText);
       let entityId = mention.entityId ?? entityIds.get(key) ?? null;
 
       if (!entityId) {
-        const created = await this.entitiesRepo.createCandidate(
-          mention.mentionText,
-          asEntityType(mention.suggestedEntityType),
-          extractionRunId,
-        );
-        entityId = created.id;
+        const entityType = asEntityType(mention.suggestedEntityType);
+        rpcEntities.push({
+          name: mention.mentionText,
+          entity_type: entityType,
+          normalized_name: key,
+        });
+        entityIds.set(key, mention.mentionText);
       }
 
-      entityIds.set(key, entityId);
+      resolvedEntityNames.add(mention.mentionText);
+    }
 
-      await this.inboxItemEntitiesRepo.createCandidate({
-        inboxItemId,
-        extractionRunId,
-        entityId,
-        sourceExcerpt: mention.sourceExcerpt,
+    // RPC payload: inbox_item_entities
+    const rpcInboxItemEntities: PersistExtractionCandidatesV2Input['inboxItemEntities'] = [];
+    for (const mention of compiled.resolvedEntities) {
+      if (!isMvpAutoRegistryEntityType(mention.suggestedEntityType)) continue;
+      if (isMvpBlockedGenericEntityTerm(mention.mentionText)) continue;
+
+      rpcInboxItemEntities.push({
+        entity_name: mention.mentionText,
+        relation_type: 'mentioned',
+        source_excerpt: mention.sourceExcerpt,
         confidence: mention.confidence,
-        correctionId,
       });
     }
 
-    const aliasEvidenceIds: string[] = [];
+    // RPC payload: aliases
+    const rpcAliases: PersistExtractionCandidatesV2Input['aliases'] = [];
     for (const alias of compiled.aliases) {
       const targetKey = normalizeText(alias.targetReference);
       let targetEntityId =
         alias.targetEntityId ?? entityIds.get(targetKey) ?? entityIds.get(normalizeText(alias.alias));
 
       if (!targetEntityId) {
-        const created = await this.entitiesRepo.createCandidate(
-          alias.targetReference,
-          'person',
-          extractionRunId,
-        );
-        targetEntityId = created.id;
+        rpcEntities.push({
+          name: alias.targetReference,
+          entity_type: 'person',
+          normalized_name: targetKey,
+        });
+        entityIds.set(targetKey, alias.targetReference);
       }
-      entityIds.set(targetKey, targetEntityId);
 
-      const aliasRow = await this.entitiesRepo.createAliasCandidate(
-        targetEntityId,
-        alias.alias,
-        extractionRunId,
-      );
-      const evidence = await this.aliasEvidencesRepo.createCandidate({
-        entityAliasId: aliasRow.id,
-        inboxItemId,
-        extractionRunId,
-        sourceExcerpt: alias.sourceExcerpt,
-        sourceBlockReference: alias.sourceBlockReference,
+      rpcAliases.push({
+        target_entity_name: alias.targetReference,
+        alias: alias.alias,
+        source_excerpt: alias.sourceExcerpt,
+        source_block_ref: alias.sourceBlockReference,
         confidence: alias.confidence,
       });
-      aliasEvidenceIds.push(evidence.id);
     }
 
-    const eventIds: string[] = [];
+    // RPC payload: events
+    const rpcEvents: PersistExtractionCandidatesV2Input['events'] = [];
     for (const event of compiled.events) {
-      const created = await this.eventsRepo.createCandidate(
-        inboxItemId,
-        extractionRunId,
-        event,
-        correctionId,
-      );
-      eventIds.push(created.id);
-
+      const relatedEntities: PersistExtractionCandidatesV2Input['events'][0]['related_entities'] = [];
       for (const link of event.relatedEntities) {
-        await this.eventsRepo.linkEntity(created.id, {
-          entityId: link.entityId,
-          entityReference: link.entityReference,
-          relationType: link.relationType,
+        relatedEntities.push({
+          entity_name: link.entityReference,
+          relation_type: link.relationType,
           role: link.role,
-          resolutionStatus: link.resolutionStatus,
+          resolution_status: link.resolutionStatus,
         });
+        resolvedEntityNames.add(link.entityReference);
       }
+
+      rpcEvents.push({
+        event_kind: event.eventKind,
+        title: event.title,
+        occurred_at: event.occurredAt,
+        episodic_confidence: event.episodicConfidence,
+        source_excerpt: event.sourceExcerpt,
+        source_block_ref: event.sourceBlockReference,
+        confidence: event.confidence,
+        related_entities: relatedEntities,
+      });
     }
 
-    const assertionIds: string[] = [];
+    // RPC payload: assertions
+    const rpcAssertions: PersistExtractionCandidatesV2Input['assertions'] = [];
     for (const assertion of compiled.assertions) {
-      const subjectEntityId =
-        assertion.subjectEntityId ??
-        entityIds.get(normalizeText(assertion.subjectReference)) ??
-        null;
-      const withSubject = { ...assertion, subjectEntityId };
-      const created = await this.assertionsRepo.createCandidate(
-        inboxItemId,
-        extractionRunId,
-        withSubject,
-        correctionId,
-      );
-      assertionIds.push(created.id);
-
-      if (subjectEntityId) {
-        await this.assertionsRepo.linkEntity(created.id, {
-          entityId: subjectEntityId,
-          entityReference: assertion.subjectReference,
-          referenceRole: 'subject',
-          resolutionStatus: 'resolved',
-        });
-      }
-
+      rpcAssertions.push({
+        assertion_kind: assertion.assertionKind,
+        subject_ref: assertion.subjectReference,
+        subject_entity_name: assertion.subjectEntityId ? assertion.subjectReference : null,
+        predicate: assertion.predicate,
+        object_ref: assertion.objectReference,
+        value_text: assertion.valueText,
+        source_excerpt: assertion.sourceExcerpt,
+        source_block_ref: assertion.sourceBlockReference,
+        confidence: assertion.confidence,
+        related_entity_refs: assertion.relatedEntityReferences,
+      });
+      resolvedEntityNames.add(assertion.subjectReference);
       for (const ref of assertion.relatedEntityReferences) {
-        const eid = entityIds.get(normalizeText(ref)) ?? null;
-        await this.assertionsRepo.linkEntity(created.id, {
-          entityId: eid,
-          entityReference: ref,
-          referenceRole: 'related',
-          resolutionStatus: eid ? 'resolved' : 'unresolved',
-        });
+        resolvedEntityNames.add(ref);
       }
     }
 
+    // RPC payload: task_mutations
     const evidenceByIndex = new Map(
       (input.contextResolutionEvidence ?? []).map((e) => [e.taskSignalIndex, e]),
     );
@@ -207,7 +183,7 @@ export class PersistenceV2Service {
       (input.taskSignalResolutions ?? []).map((r) => [r.taskSignalIndex, r]),
     );
 
-    const taskMutationIds: string[] = [];
+    const rpcTaskMutations: PersistExtractionCandidatesV2Input['taskMutations'] = [];
 
     for (let i = 0; i < compiled.tasks.length; i++) {
       const task = compiled.tasks[i]!;
@@ -218,50 +194,103 @@ export class PersistenceV2Service {
           ? null
           : resolution?.outcome.taskId ?? null;
 
-      const assigneeEntityId =
-        task.assigneeEntityId ??
-        (task.assigneeReference
-          ? (entityIds.get(normalizeText(task.assigneeReference)) ?? null)
-          : null);
-      const projectEntityId =
-        task.projectEntityId ??
-        (task.projectReference
-          ? (entityIds.get(normalizeText(task.projectReference)) ?? null)
-          : null);
+      const due = dueAtColumnsFromTemporal(task.dueAtTemporal, task.dueAt);
 
-      const created = await this.taskMutationsRepo.createCandidate(
-        inboxItemId,
-        extractionRunId,
-        task,
-        {
-          taskId,
-          assigneeEntityId,
-          projectEntityId,
-          contextResolutionEvidence: evidence,
-          correctionId,
-        },
-      );
-      taskMutationIds.push(created.id);
+      rpcTaskMutations.push({
+        operation: task.operation,
+        task_ref: task.taskReference,
+        title: task.title,
+        task_kind: task.taskKind,
+        status_signal: task.statusSignal,
+        assignee_entity_name: task.assigneeReference ?? (task.assigneeEntityId ? task.assigneeReference : null),
+        project_entity_name: task.projectReference ?? (task.projectEntityId ? task.projectReference : null),
+        blocked_reason: task.blockedReason,
+        source_excerpt: task.sourceExcerpt,
+        source_block_ref: task.sourceBlockReference,
+        confidence: task.confidence,
+        task_id: taskId,
+        context_resolution_evidence: evidence as Record<string, unknown> | null | undefined ?? null,
+        due_at_literal: due.due_at_literal,
+        due_at_local_date: due.due_at_local_date,
+        due_at_local_time: due.due_at_local_time,
+        due_at_instant: due.due_at_instant,
+        due_at_timezone: due.due_at_timezone,
+        due_at_precision: due.due_at_precision,
+        due_at_status: due.due_at_status,
+        due_at_reason_code: due.due_at_reason_code,
+        due_at_normalizer_version: due.due_at_normalizer_version,
+        due_at_implicit_year: due.due_at_implicit_year,
+        due_at_implicit_month: due.due_at_implicit_month,
+      });
+
+      if (task.assigneeReference) resolvedEntityNames.add(task.assigneeReference);
+      if (task.projectReference) resolvedEntityNames.add(task.projectReference);
     }
 
-    const toPersist = [
+    // RPC payload: clarifications
+    const rpcClarifications: PersistExtractionCandidatesV2Input['clarifications'] = [];
+    const allClarifications = [
       ...clarifications.blocking,
       ...clarifications.nonBlocking,
     ];
-    const savedClarifications = await this.clarificationsRepo.createManyCandidates(
+    for (const c of allClarifications) {
+      rpcClarifications.push({
+        target_type: c.targetType,
+        target_reference: c.targetReference,
+        issue_type: c.issueType,
+        question: c.question,
+        reason: c.reason,
+        priority: c.priority,
+        blocking_scope: c.blockingScope,
+        materiality: c.materiality,
+        suggested_answers: c.suggestedAnswers,
+        source_excerpt: c.sourceExcerpt,
+        source: c.source,
+      });
+    }
+
+    // Ensure all referenced entity names are in the entities list
+    for (const name of resolvedEntityNames) {
+      const key = normalizeText(name);
+      if (!entityIds.has(key)) continue;
+      const alreadyInRpc = rpcEntities.some((e) => e.normalized_name === key);
+      if (!alreadyInRpc) {
+        rpcEntities.push({
+          name,
+          entity_type: 'other',
+          normalized_name: key,
+        });
+      }
+    }
+
+    // Deduplicate entities by normalized_name
+    const seenEntityNames = new Set<string>();
+    const dedupedEntities = rpcEntities.filter((e) => {
+      if (seenEntityNames.has(e.normalized_name)) return false;
+      seenEntityNames.add(e.normalized_name);
+      return true;
+    });
+
+    await this.rpc.persistCandidates({
       inboxItemId,
       extractionRunId,
-      toPersist,
-      correctionId,
-    );
+      correctionId: correctionId ?? null,
+      entities: dedupedEntities,
+      inboxItemEntities: rpcInboxItemEntities,
+      aliases: rpcAliases,
+      events: rpcEvents,
+      assertions: rpcAssertions,
+      taskMutations: rpcTaskMutations,
+      clarifications: rpcClarifications,
+    });
 
     return {
-      entityIds,
-      eventIds,
-      assertionIds,
-      taskMutationIds,
-      clarificationIds: savedClarifications.map((c) => c.id),
-      aliasEvidenceIds,
+      entityIds: new Map(entityIds),
+      eventIds: compiled.events.map(() => ''),
+      assertionIds: compiled.assertions.map(() => ''),
+      taskMutationIds: compiled.tasks.map(() => ''),
+      clarificationIds: allClarifications.map(() => ''),
+      aliasEvidenceIds: compiled.aliases.map(() => ''),
     };
   }
 }

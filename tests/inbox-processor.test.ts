@@ -33,7 +33,7 @@ describe('Scenario expectations', () => {
     )!;
     expect(c.mock_output.assertions[0]?.assertion_type).toBe('hypothesis');
     expect(
-      (c as { mock_output: { clarification_requests: unknown[] } }).mock_output.clarification_requests,
+      (c as unknown as { mock_output: { clarification_requests: unknown[] } }).mock_output.clarification_requests,
     ).toHaveLength(0);
   });
 

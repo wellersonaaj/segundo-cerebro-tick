@@ -3,7 +3,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { FIXED_EXTRACTOR_FIXTURES } from '../src/calibration/extractor-v1.4/fixed-extractor-fixtures.js';
-import { ClarificationManagerV2Service } from '../src/services/clarification-manager-v2.service.js';
+import { classifyClarifications } from '../src/types/clarification-types.js';
 import { MemoryCompilerV2Service } from '../src/services/memory-compiler-v2.service.js';
 import {
   collectReferenceTextsFromExtractor,
@@ -32,19 +32,7 @@ function compileScenario(
     resolverResult,
     temporalAnchor,
   });
-  const recommended = new ClarificationManagerV2Service().recommend({
-    llmCandidates: compiled.clarificationCandidates.filter((c) => c.source === 'llm'),
-    compilerCandidates: compiled.clarificationCandidates.filter((c) => c.source !== 'llm'),
-    resolverResult,
-    flags: compiled.flags,
-    extractorOutput: output,
-    compiled: {
-      tasks: compiled.tasks,
-      assertions: compiled.assertions,
-      events: compiled.events,
-    },
-    effectiveInput: rawContent,
-  });
+  const recommended = classifyClarifications(compiled.clarificationCandidates).blocking;
   return { compiled, recommended, resolverResult };
 }
 
@@ -178,53 +166,41 @@ describe('MemoryCompilerV2Service', () => {
       }
     }
 
-    const materiality = new ClarificationManagerV2Service().classify({
-      llmCandidates: [],
-      compilerCandidates: new MemoryCompilerV2Service()
-        .compile({
-          extractorOutput: parseExtractorOutputV14({
-            schema_version: '1.4',
-            entity_mentions: [],
-            aliases: [],
-            events: [],
-            correction_signals: [],
-            assertions: [],
-            task_signals: [
-              {
-                operation: 'create',
-                title: 'Cobrar o fornecedor amanhã.',
-                task_kind: 'follow_up',
-                status_signal: 'open',
-                assignee_reference: null,
-                target_reference: 'fornecedor',
-                project_reference: null,
-                due_at: '2026-06-02',
-                blocked_reason: null,
-                source_excerpt: 'Preciso cobrar o fornecedor amanhã.',
-                source_block_reference: '[SOURCE_BLOCK:raw]',
-                confidence: 0.9,
-                task_reference: null,
-              },
-            ],
-            clarification_candidates: [],
-            review_hints: [],
-            extraction_notes: [],
-          }),
-          effectiveInput: '[SOURCE_BLOCK:raw]\nPreciso cobrar o fornecedor amanhã.',
-          resolverResult: new ReferenceResolverService(registry.entities).resolveReferences([]),
-          temporalAnchor: CALIBRATION_DEFAULT_TEMPORAL_ANCHOR,
-        })
-        .clarificationCandidates.filter((c) => c.source !== 'llm'),
-      resolverResult: new ReferenceResolverService(registry.entities).resolveReferences([]),
-      flags: {
-        negatedReferences: [],
-        supersededReferences: [],
-        presentSourceBlocks: ['[SOURCE_BLOCK:raw]'],
-        contextResolvedTasks: [],
-        contextAmbiguousTasks: [],
-      },
-      effectiveInput: '[SOURCE_BLOCK:raw]\nPreciso cobrar o fornecedor amanhã.',
+    const outputForCM = parseExtractorOutputV14({
+      schema_version: '1.4',
+      entity_mentions: [],
+      aliases: [],
+      events: [],
+      correction_signals: [],
+      assertions: [],
+      task_signals: [
+        {
+          operation: 'create',
+          title: 'Cobrar o fornecedor amanhã.',
+          task_kind: 'follow_up',
+          status_signal: 'open',
+          assignee_reference: null,
+          target_reference: 'fornecedor',
+          project_reference: null,
+          due_at: '2026-06-02',
+          blocked_reason: null,
+          source_excerpt: 'Preciso cobrar o fornecedor amanhã.',
+          source_block_reference: '[SOURCE_BLOCK:raw]',
+          confidence: 0.9,
+          task_reference: null,
+        },
+      ],
+      clarification_candidates: [],
+      review_hints: [],
+      extraction_notes: [],
     });
+    const compiledForCM = new MemoryCompilerV2Service().compile({
+      extractorOutput: outputForCM,
+      effectiveInput: '[SOURCE_BLOCK:raw]\nPreciso cobrar o fornecedor amanhã.',
+      resolverResult: new ReferenceResolverService(registry.entities).resolveReferences([]),
+      temporalAnchor: CALIBRATION_DEFAULT_TEMPORAL_ANCHOR,
+    });
+    const materiality = classifyClarifications(compiledForCM.clarificationCandidates);
     expect(
       [...materiality.blocking, ...materiality.nonBlocking].some(
         (c) => c.issueType === 'missing_task_target',
@@ -343,7 +319,7 @@ describe('MemoryCompilerV2Service', () => {
     expect(recommended.some((c) => c.issueType === 'ambiguous_entity_identity')).toBe(true);
   });
 
-  it('source_block_reference inválida → rejected decision', () => {
+  it('source_block_reference inválida → compilerNote, not rejected', () => {
     const resolver = new ReferenceResolverService(registry.entities);
     const output = {
       ...FIXED_EXTRACTOR_FIXTURES['v14-task-open']!,
@@ -360,7 +336,8 @@ describe('MemoryCompilerV2Service', () => {
       effectiveInput: '[SOURCE_BLOCK:raw]\nonly raw',
       resolverResult,
     });
-    expect(compiled.decision.status).toBe('rejected');
+    expect(compiled.decision.status).toBe('accepted');
+    expect(compiled.compilerNotes.length).toBeGreaterThan(0);
   });
 
   it('needs_llm_review extension point', () => {
@@ -489,19 +466,7 @@ describe('MemoryCompilerV2Service', () => {
       compiled.compilerNotes.some((n) => n.includes('peripheral_ambiguity_ignored')),
     ).toBe(true);
 
-    const materiality = new ClarificationManagerV2Service().classify({
-      llmCandidates: compiled.clarificationCandidates.filter((c) => c.source === 'llm'),
-      compilerCandidates: compiled.clarificationCandidates.filter((c) => c.source !== 'llm'),
-      resolverResult,
-      flags: compiled.flags,
-      extractorOutput: output,
-      compiled: {
-        tasks: compiled.tasks,
-        assertions: compiled.assertions,
-        events: compiled.events,
-      },
-      effectiveInput: 'Marcelo → Bruno',
-    });
+    const materiality = classifyClarifications(compiled.clarificationCandidates);
     expect(
       materiality.blocking.filter((c) => c.blockingScope === 'knowledge_confirmation'),
     ).toHaveLength(0);
@@ -593,19 +558,7 @@ describe('MemoryCompilerV2Service', () => {
       compiled.compilerNotes.filter((n) => n.includes('peripheral_ambiguity_ignored: ESX')),
     ).toHaveLength(1);
 
-    const materiality = new ClarificationManagerV2Service().classify({
-      llmCandidates: compiled.clarificationCandidates.filter((c) => c.source === 'llm'),
-      compilerCandidates: compiled.clarificationCandidates.filter((c) => c.source !== 'llm'),
-      resolverResult,
-      flags: compiled.flags,
-      extractorOutput: output,
-      compiled: {
-        tasks: compiled.tasks,
-        assertions: compiled.assertions,
-        events: compiled.events,
-      },
-      effectiveInput: 'ESX',
-    });
+    const materiality = classifyClarifications(compiled.clarificationCandidates);
     const esxKc = materiality.nonBlocking.filter(
       (c) => c.targetReference === 'ESX' && c.blockingScope === 'knowledge_confirmation',
     );

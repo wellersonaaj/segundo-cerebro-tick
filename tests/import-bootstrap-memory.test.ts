@@ -129,8 +129,8 @@ describe('bootstrap import', () => {
   it('runBootstrapImport GET /health without body and POST /inbox-items with Content-Type', async () => {
     const filePath = makeTempFile('# Panorama\n\nConteúdo.');
     const calls: Array<{ path: string; init?: { method?: string; headers?: Record<string, string>; body?: string } }> = [];
-    const fetchFn = vi.fn(async (p: string, init?: { method?: string; headers?: Record<string, string>; body?: string }) => {
-      calls.push({ path: p, init });
+    const fetchFn = vi.fn(async (p: string, init?: RequestInit) => {
+      calls.push({ path: p, init: init as { method?: string; headers?: Record<string, string>; body?: string } });
       if (p === '/health') {
         return { status: 200, body: { status: 'ok' } };
       }

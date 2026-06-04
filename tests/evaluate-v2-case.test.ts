@@ -85,6 +85,7 @@ describe('evaluateV2Case', () => {
           assigneeEntityId: null,
           projectEntityId: null,
           dueAt: 'segunda',
+          dueAtTemporal: null,
           blockedReason: null,
           sourceExcerpt: 'x',
           sourceBlockReference: null,

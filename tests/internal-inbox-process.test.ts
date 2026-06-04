@@ -36,13 +36,21 @@ function processUrl(id = INBOX_ID): string {
   return `/internal/inbox-items/${id}/process`;
 }
 
+const defaultRunReprocess = vi.fn(async () => ({
+  inbox_item_id: 'x',
+  processing_status: 'completed' as const,
+}));
+
 async function buildInternalApp(
   findById: (id: string) => Promise<InboxItem | null>,
-  pipeline: InboxItemProcessPipeline | null = null,
+  pipeline: Partial<InboxItemProcessPipeline> | null = null,
 ) {
+  const fullPipeline: InboxItemProcessPipeline | null = pipeline
+    ? { runReprocess: defaultRunReprocess, ...pipeline } as InboxItemProcessPipeline
+    : null;
   const inboxRepo = { findById: vi.fn(findById) };
-  const inboxItemProcess = new InboxItemProcessService(inboxRepo as never, pipeline);
-  return buildApp({ extract: EXTRACTOR, inboxItemProcess });
+  const inboxItemProcess = new InboxItemProcessService(inboxRepo as never, fullPipeline);
+  return buildApp({ inboxItemProcess });
 }
 
 describe('POST /internal/inbox-items/:id/process (Checkpoint A)', () => {

@@ -99,3 +99,9 @@
 * **Localidade de referência:** Rio de Janeiro
 * **Relação com Wellerson:** ex-colega de trabalho
 * **Relação atual com a VELT:** potencial investidor em negociação
+
+## Gabriel Xavier
+
+* **Localidade de referência:** Belo Horizonte, Bairro Serra
+* **Relação com Wellerson:** amigo
+

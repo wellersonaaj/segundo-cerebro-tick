@@ -2,7 +2,7 @@ import type { ExtractorOutputV14 } from '../../openai/extractor-v1.4.types.js';
 import type { CompiledClarificationCandidateV2, CompiledMemoryV2 } from '../../types/memory-compiler-v2.js';
 import type { CompilerDecisionStatus } from '../../types/memory-compiler-v2.js';
 import { matchesMustNotEntityMention } from './entity-mention-match.js';
-import type { FinalClarificationDecision } from '../../services/clarification-manager-v2.service.js';
+import type { FinalClarificationDecision } from '../../types/clarification-types.js';
 import type { V14CalibrationExpectations } from './fixed-calibration-expectations.js';
 
 export interface V14CaseEvaluationResult {

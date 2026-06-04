@@ -37,7 +37,7 @@ describe('Telegram webhook', () => {
 
   it('returns 503 when Telegram env is not configured', async () => {
     resetEnvCache();
-    const app = await buildApp({ extract: createScenarioExtractor('case-01-past-event-no-date') });
+    const app = await buildApp({});
     const res = await app.inject({
       method: 'POST',
       url: '/webhooks/telegram',
@@ -58,9 +58,9 @@ describe('Telegram webhook', () => {
     globalThis.fetch = vi.fn(async () => ({
       ok: true,
       json: async () => ({ ok: true }),
-    })) as typeof fetch;
+    })) as unknown as typeof fetch;
 
-    const app = await buildApp({ extract: createScenarioExtractor('case-01-past-event-no-date') });
+    const app = await buildApp({});
     const res = await app.inject({
       method: 'POST',
       url: '/webhooks/telegram',
@@ -78,9 +78,9 @@ describe('Telegram webhook', () => {
     globalThis.fetch = vi.fn(async () => ({
       ok: true,
       json: async () => ({ ok: true }),
-    })) as typeof fetch;
+    })) as unknown as typeof fetch;
 
-    const app = await buildApp({ extract: createScenarioExtractor('case-01-past-event-no-date') });
+    const app = await buildApp({});
     const res = await app.inject({
       method: 'POST',
       url: '/webhooks/telegram',

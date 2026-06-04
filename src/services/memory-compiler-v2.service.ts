@@ -342,13 +342,6 @@ export class MemoryCompilerV2Service {
         assertSourceBlockExists(ref, present, field);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        dropped.push({
-          kind: 'assertion',
-          reason: 'invalid_source_block',
-          originalRef: refLabel,
-          sourceExcerpt: ref,
-          note: msg,
-        });
         notes.push(msg);
       }
     };
@@ -1073,14 +1066,6 @@ export class MemoryCompilerV2Service {
         status: 'needs_llm_review',
         reasons: ['possible_contradiction_hint'],
         confidence: 0.6,
-      };
-    }
-
-    if (dropped.some((d) => d.reason === 'invalid_source_block')) {
-      return {
-        status: 'rejected',
-        reasons: ['invalid_source_block_reference'],
-        confidence: 0.9,
       };
     }
 

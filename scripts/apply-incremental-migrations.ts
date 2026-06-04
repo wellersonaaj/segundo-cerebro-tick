@@ -21,6 +21,7 @@ loadDotEnv();
 const INCREMENTAL_MIGRATIONS = [
   '20260603120000_s1_simplify_promote_blocking_scope.sql',
   '20260603130000_s2_external_action_no_promote_block.sql',
+  '20260604000000_persist_extraction_candidates.sql',
 ] as const;
 
 function fail(msg: string): never {

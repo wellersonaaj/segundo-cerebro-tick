@@ -12,7 +12,6 @@ import { registerTasksRoutes } from './api/tasks.routes.js';
 import { registerTelegramWebhookRoutes } from './api/telegram-webhook.routes.js';
 import { enforceInternalApiAccess } from './config/internal-api-access.js';
 import { getSupabase } from './db/supabase.js';
-import { createOpenAiExtractor, type ExtractFn } from './openai/extractor.service.js';
 import { createOpenAiExtractorV14 } from './openai/extractor-v1.4.service.js';
 import { AssertionsRepository } from './repositories/assertions.repository.js';
 import { AssertionsAuditRepository } from './repositories/assertions-audit.repository.js';
@@ -34,12 +33,10 @@ import { ClarificationService } from './services/clarification.service.js';
 import { CorrectionService, ReprocessService } from './services/correction.service.js';
 import { ExtractionPipelineV14Service } from './services/extraction-pipeline-v14.service.js';
 import { InboxItemProcessService } from './services/inbox-item-process.service.js';
-import { InboxProcessorService } from './services/inbox-processor.service.js';
 import { MemorySearchService } from './services/memory-search.service.js';
 import { TelegramInboxService } from './services/telegram-inbox.service.js';
 
 export interface AppDeps {
-  extract?: ExtractFn;
   inboxItemProcess?: InboxItemProcessService;
   auditService?: AuditService;
   assistantTurn?: AssistantTurnService;
@@ -56,10 +53,8 @@ export async function buildApp(deps: AppDeps = {}) {
   });
 
   const db = getSupabase();
-  const extract = deps.extract ?? createOpenAiExtractor();
-  const processor = new InboxProcessorService(db, extract);
-  const corrections = new CorrectionService(db, extract);
-  const reprocess = new ReprocessService(db, extract);
+  const corrections = new CorrectionService(db);
+  const reprocess = new ReprocessService(db);
   const v14Pipeline = new ExtractionPipelineV14Service(db, createOpenAiExtractorV14());
   const inboxItemProcess =
     deps.inboxItemProcess ??
@@ -91,7 +86,7 @@ export async function buildApp(deps: AppDeps = {}) {
 
   await registerHealthRoutes(app);
   await registerInboxRoutes(app, {
-    processor,
+    inboxItemProcess,
     corrections,
     reprocess,
     inboxRepo: inboxRepo,

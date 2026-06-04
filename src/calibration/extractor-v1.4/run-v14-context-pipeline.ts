@@ -6,7 +6,10 @@ import {
   mergeSourceMetadata,
   normalizeCaseSourceMetadata,
 } from './load-ingestion-context.js';
-import { ClarificationManagerV2Service } from '../../services/clarification-manager-v2.service.js';
+import {
+  classifyClarifications,
+  computeFinalDecisionFromMateriality,
+} from '../../types/clarification-types.js';
 import { IngestionContextSelectorService } from '../../services/ingestion-context-selector.service.js';
 import { MemoryCompilerV2Service } from '../../services/memory-compiler-v2.service.js';
 import {
@@ -91,27 +94,9 @@ export function runV14ContextPipeline(params: {
     temporalAnchor,
   });
 
-  const clarificationManager = new ClarificationManagerV2Service();
-  const cmInput = {
-    llmCandidates: compiled.clarificationCandidates.filter((c) => c.source === 'llm'),
-    compilerCandidates: compiled.clarificationCandidates.filter((c) => c.source !== 'llm'),
-    resolverResult,
-    flags: compiled.flags,
-    extractorOutput,
-    compiled: {
-      tasks: compiled.tasks,
-      assertions: compiled.assertions,
-      events: compiled.events,
-    },
-    effectiveInput: caseFile.raw_content,
-    ingestionContext: compactContext,
-    taskSignalResolutions,
-    contextResolutionEvidence: compiled.contextResolutionEvidence,
-    regime: expected.regime ?? caseFile.regime,
-  };
-  const clarificationMateriality = clarificationManager.classify(cmInput);
+  const clarificationMateriality = classifyClarifications(compiled.clarificationCandidates);
   const recommended = clarificationMateriality.blocking;
-  const finalDecision = clarificationManager.computeFinalDecision(clarificationMateriality);
+  const finalDecision = computeFinalDecisionFromMateriality(clarificationMateriality);
 
   const evaluation = evaluateV2Case(
     params.scenarioId,

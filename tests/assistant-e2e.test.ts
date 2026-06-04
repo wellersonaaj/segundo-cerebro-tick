@@ -28,7 +28,7 @@ function createMockDeps(overrides?: {
 
   return {
     inboxRepo: {
-      findBySourceReference: vi.fn(async () => null),
+      findBySourceReference: vi.fn(async () => null as typeof inboxItem | null),
       create: vi.fn(async () => inboxItem),
       findById: vi.fn(async () => inboxItem),
       updateMetadata: vi.fn(async () => {}),
@@ -150,11 +150,8 @@ describe('AssistantTurnService', () => {
       timezone: 'America/Sao_Paulo',
       source_reference: 'telegram:chat:123:message:99',
       delivery: {
-        sendAck: async (msg) => sent.push(msg),
-        sendFollowUp: async (msg) => {
-          sent.push(msg);
-          return null;
-        },
+        sendAck: async (msg) => { sent.push(msg); },
+        sendFollowUp: async (msg) => { sent.push(msg); return null; },
       },
     });
 
@@ -190,11 +187,8 @@ describe('AssistantTurnService', () => {
       received_at: new Date().toISOString(),
       timezone: 'America/Sao_Paulo',
       delivery: {
-        sendAck: async (msg) => sent.push(msg),
-        sendFollowUp: async (msg) => {
-          sent.push(msg);
-          return null;
-        },
+        sendAck: async (msg) => { sent.push(msg); },
+        sendFollowUp: async (msg) => { sent.push(msg); return null; },
       },
     });
 
@@ -236,7 +230,7 @@ describe('Telegram webhook assistant flow', () => {
         ok: true,
         json: async () => ({ ok: true, result: { message_id: 100 + sentMessages.length } }),
       };
-    }) as typeof fetch;
+    }) as unknown as typeof fetch;
 
     const deps = createMockDeps();
     const assistantTurn = new AssistantTurnService(

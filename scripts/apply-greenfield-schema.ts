@@ -25,6 +25,7 @@ const MIGRATIONS = [
   '20260602100002_greenfield_seeds.sql',
   '20260603120000_s1_simplify_promote_blocking_scope.sql',
   '20260603130000_s2_external_action_no_promote_block.sql',
+  '20260604000000_persist_extraction_candidates.sql',
 ] as const;
 
 const MIGRATION_LABELS: Record<(typeof MIGRATIONS)[number], string> = {
@@ -33,9 +34,11 @@ const MIGRATION_LABELS: Record<(typeof MIGRATIONS)[number], string> = {
   '20260602100002_greenfield_seeds.sql': 'seeds applied',
   '20260603120000_s1_simplify_promote_blocking_scope.sql': 'S1 promote blocking_scope applied',
   '20260603130000_s2_external_action_no_promote_block.sql': 'S2 external_action no promote block applied',
+  '20260604000000_persist_extraction_candidates.sql': 'persist_extraction_candidates RPC applied',
 };
 
 const DROP_GREENFIELD_OBJECTS = `
+drop function if exists public.persist_extraction_candidates(uuid, uuid, uuid, jsonb, jsonb, jsonb, jsonb, jsonb, jsonb, jsonb) cascade;
 drop function if exists public.fail_extraction_run(uuid, text) cascade;
 drop function if exists public.promote_extraction_run(uuid) cascade;
 drop function if exists public.start_extraction_run(uuid, text, text, text, text, text, text, text, uuid, text) cascade;
@@ -197,6 +200,7 @@ async function main(): Promise<void> {
   console.log('  3. 20260602100002_greenfield_seeds.sql');
   console.log('  4. 20260603120000_s1_simplify_promote_blocking_scope.sql');
   console.log('  5. 20260603130000_s2_external_action_no_promote_block.sql');
+  console.log('  6. 20260604000000_persist_extraction_candidates.sql');
   console.log('\nSchema greenfield aplicado. Rode: npm run verify:env\n');
   console.log(
     'Deploy incremental (sem drop): SUPABASE_DB_PASSWORD=... npm run db:apply-incremental-migrations\n',

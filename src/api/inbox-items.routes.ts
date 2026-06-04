@@ -4,8 +4,8 @@ import type { InboxItemEntitiesRepository } from '../repositories/inbox-item-ent
 import type { EntitiesRepository } from '../repositories/entities.repository.js';
 import type { ExtractionRunsRepository } from '../repositories/extraction-runs.repository.js';
 import type { InboxItemsRepository } from '../repositories/inbox-items.repository.js';
-import type { InboxProcessorService } from '../services/inbox-processor.service.js';
 import type { CorrectionService, ReprocessService } from '../services/correction.service.js';
+import type { InboxItemProcessService } from '../services/inbox-item-process.service.js';
 import { log } from '../utils/logger.js';
 
 const createSchema = z.object({
@@ -28,7 +28,7 @@ function enrichInboxItem<T extends { active_extraction_run_id?: string | null }>
 }
 
 export interface InboxRouteDeps {
-  processor: InboxProcessorService;
+  inboxItemProcess: InboxItemProcessService;
   corrections: CorrectionService;
   reprocess: ReprocessService;
   inboxRepo: InboxItemsRepository;
@@ -39,7 +39,7 @@ export interface InboxRouteDeps {
 
 export async function registerInboxRoutes(app: FastifyInstance, deps: InboxRouteDeps): Promise<void> {
   const {
-    processor,
+    inboxItemProcess,
     corrections,
     reprocess,
     inboxRepo,
@@ -55,7 +55,9 @@ export async function registerInboxRoutes(app: FastifyInstance, deps: InboxRoute
     }
     log('info', 'inbox_flow', { step: 'request_start', path: '/inbox-items' });
     try {
-      const result = await processor.process(parsed.data);
+      const inboxItem = await inboxRepo.create(parsed.data);
+      log('info', 'inbox_flow', { step: 'inbox_item_saved', inbox_item_id: inboxItem.id });
+      const result = await inboxItemProcess.processById(inboxItem.id);
       return reply.status(201).send(result);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

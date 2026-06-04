@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import { isGreenfieldSchemaEnabled } from '../config/env.js';
 import type { ExtractorOutputV14 } from '../openai/extractor-v1.4.types.js';
 import type { ClarificationsRepository } from '../repositories/clarifications.repository.js';
 import type { InboxItemsRepository } from '../repositories/inbox-items.repository.js';
@@ -45,8 +44,8 @@ export class AssistantTurnService {
   ) {}
 
   async startCapture(input: StartCaptureInput): Promise<AssistantTurnAck> {
-    if (!isGreenfieldSchemaEnabled() || !this.v14Process) {
-      throw new Error('GREENFIELD_PIPELINE_REQUIRED');
+    if (!this.v14Process) {
+      throw new Error('PIPELINE_NOT_WIRED');
     }
 
     const turnId = randomUUID();

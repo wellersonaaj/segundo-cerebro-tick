@@ -179,12 +179,12 @@ describe('ExtractionPipelineV14Service', () => {
     expect(extractV13).not.toHaveBeenCalled();
   });
 
-  it('decision.rejected → fail without persist or promote', async () => {
+  it('invalid_source_block → compilerNote, accepted, persist + promote', async () => {
     const compileResult = baseCompileResult({
       compiled: baseCompiled({
         decision: {
-          status: 'rejected',
-          reasons: ['invalid_source_block_reference'],
+          status: 'accepted',
+          reasons: ['compiled_without_blocking_issues'],
           confidence: 0.9,
         },
       }),
@@ -192,10 +192,10 @@ describe('ExtractionPipelineV14Service', () => {
     const { pipeline, runRpc, persistCandidates } = buildPipeline(compileResult);
     const result = await pipeline.run(inboxItem);
 
-    expect(result.processing_status).toBe('failed');
-    expect(runRpc.failExtractionRun).toHaveBeenCalledOnce();
-    expect(persistCandidates).not.toHaveBeenCalled();
-    expect(runRpc.promoteExtractionRun).not.toHaveBeenCalled();
+    expect(result.processing_status).toBe('completed');
+    expect(persistCandidates).toHaveBeenCalledOnce();
+    expect(runRpc.promoteExtractionRun).toHaveBeenCalledOnce();
+    expect(runRpc.failExtractionRun).not.toHaveBeenCalled();
   });
 
   it('external_action pending → promote allowed; needs_clarification; no external side effect', async () => {

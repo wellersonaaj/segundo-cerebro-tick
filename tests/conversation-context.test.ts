@@ -130,7 +130,7 @@ describe('thread pronoun coreference', () => {
         {
           target_type: 'entity',
           target_reference: 'ela',
-          issue_type: 'ambiguous_entity_identity',
+          issue_type: 'ambiguous_identity',
           question: "Quem é 'ela'?",
           reason: 'pronome',
           priority: 'medium',

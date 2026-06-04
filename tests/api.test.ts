@@ -6,7 +6,7 @@ import { createScenarioExtractor } from './helpers/mock-extractor.js';
 
 describe('API (unit — extractor mocked)', () => {
   it('GET /health returns ok', async () => {
-    const app = await buildApp({ extract: createScenarioExtractor('case-01-past-event-no-date') });
+    const app = await buildApp({});
     const res = await app.inject({ method: 'GET', url: '/health' });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({ status: 'ok' });
@@ -14,7 +14,7 @@ describe('API (unit — extractor mocked)', () => {
   });
 
   it('POST /inbox-items validates body', async () => {
-    const app = await buildApp({ extract: createScenarioExtractor('case-01-past-event-no-date') });
+    const app = await buildApp({});
     const res = await app.inject({
       method: 'POST',
       url: '/inbox-items',

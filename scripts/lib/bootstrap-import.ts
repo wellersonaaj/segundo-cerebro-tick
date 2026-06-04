@@ -176,7 +176,7 @@ export async function runBootstrapImport(options: RunBootstrapImportOptions): Pr
 
   logFn(`\n${BOOTSTRAP_BANNER}\n`);
 
-  let content: string;
+  let content = '';
   try {
     content = readBootstrapMarkdownFile(options.filePath, options.readFileFn);
     const maxChars = resolveBootstrapMaxChars(env, options.maxChars);

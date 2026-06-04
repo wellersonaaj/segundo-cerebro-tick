@@ -177,7 +177,7 @@ describe('PersistenceService persistCandidates', () => {
   });
 
   it('persists all assertions without silent truncation', async () => {
-    const createAssertion = vi.fn(async () => ({ id: 'a1' }));
+    const createAssertion = vi.fn(async () => ({ id: 'a1' })) as never;
     const assertions = Array.from({ length: 20 }, (_, i) => ({
       assertion_type: 'fact' as const,
       content: `fact ${i}`,

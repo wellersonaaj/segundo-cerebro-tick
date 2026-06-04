@@ -169,11 +169,13 @@ describe('live-metrics preference_to_event_rate N/A', () => {
         events: [
           {
             eventKind: 'meeting',
-            subjectReference: 'Alex',
-            relatedEntityReferences: [],
+            title: 'meeting',
+            occurredAt: null,
+            relatedEntities: [],
             sourceExcerpt: 'x',
             sourceBlockReference: null,
             episodicConfidence: 0.9,
+            confidence: 0.9,
           },
         ],
       }),
@@ -329,6 +331,7 @@ describe('live-metrics task_operations', () => {
             assigneeEntityId: null,
             projectEntityId: null,
             dueAt: 'segunda-feira',
+            dueAtTemporal: null,
             blockedReason: null,
             sourceExcerpt: 'x',
             sourceBlockReference: null,

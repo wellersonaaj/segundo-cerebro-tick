@@ -19,6 +19,97 @@ export interface StartExtractionRunV2Result {
   inbox_item_id: string;
 }
 
+export interface PersistExtractionCandidatesV2Input {
+  inboxItemId: string;
+  extractionRunId: string;
+  correctionId?: string | null;
+  entities: Array<{
+    name: string;
+    entity_type: string;
+    normalized_name: string;
+  }>;
+  inboxItemEntities: Array<{
+    entity_name: string;
+    relation_type: string;
+    source_excerpt: string;
+    source_block_ref?: string | null;
+    confidence?: number | null;
+  }>;
+  aliases: Array<{
+    target_entity_name: string;
+    alias: string;
+    source_excerpt: string;
+    source_block_ref?: string | null;
+    confidence?: number | null;
+  }>;
+  events: Array<{
+    event_kind: string;
+    title: string;
+    occurred_at?: string | null;
+    episodic_confidence?: number | null;
+    source_excerpt: string;
+    source_block_ref?: string | null;
+    confidence?: number | null;
+    related_entities: Array<{
+      entity_name: string;
+      relation_type: string;
+      role?: string | null;
+      resolution_status: string;
+    }>;
+  }>;
+  assertions: Array<{
+    assertion_kind: string;
+    subject_ref: string;
+    subject_entity_name?: string | null;
+    predicate: string;
+    object_ref?: string | null;
+    value_text?: string | null;
+    source_excerpt: string;
+    source_block_ref?: string | null;
+    confidence?: number | null;
+    related_entity_refs: string[];
+  }>;
+  taskMutations: Array<{
+    operation: string;
+    task_ref?: string | null;
+    title?: string | null;
+    task_kind?: string | null;
+    status_signal?: string | null;
+    assignee_entity_name?: string | null;
+    project_entity_name?: string | null;
+    blocked_reason?: string | null;
+    source_excerpt: string;
+    source_block_ref?: string | null;
+    confidence?: number | null;
+    task_id?: string | null;
+    context_resolution_evidence?: Record<string, unknown> | null;
+    due_at_literal?: string | null;
+    due_at_local_date?: string | null;
+    due_at_local_time?: string | null;
+    due_at_instant?: string | null;
+    due_at_timezone?: string | null;
+    due_at_precision?: string | null;
+    due_at_status?: string | null;
+    due_at_reason_code?: string | null;
+    due_at_normalizer_version?: string | null;
+    due_at_implicit_year?: boolean | null;
+    due_at_implicit_month?: boolean | null;
+  }>;
+  clarifications: Array<{
+    target_type: string;
+    target_reference: string;
+    issue_type: string;
+    question: string;
+    reason: string;
+    priority: string;
+    blocking_scope: string;
+    materiality: string;
+    suggested_answers: string[];
+    source_excerpt: string;
+    source: string;
+  }>;
+}
+
 export class ExtractionRunRpcV2Repository {
   constructor(private readonly db: SupabaseClient) {}
 
@@ -51,6 +142,25 @@ export class ExtractionRunRpcV2Repository {
       p_error: errorMessage,
     });
     if (error) throw new Error(`fail_extraction_run: ${error.message}`);
+    return data as Record<string, unknown>;
+  }
+
+  async persistCandidates(
+    input: PersistExtractionCandidatesV2Input,
+  ): Promise<Record<string, unknown>> {
+    const { data, error } = await this.db.rpc('persist_extraction_candidates', {
+      p_inbox_item_id: input.inboxItemId,
+      p_extraction_run_id: input.extractionRunId,
+      p_correction_id: input.correctionId ?? null,
+      p_entities: input.entities,
+      p_inbox_item_entities: input.inboxItemEntities,
+      p_aliases: input.aliases,
+      p_events: input.events,
+      p_assertions: input.assertions,
+      p_task_mutations: input.taskMutations,
+      p_clarifications: input.clarifications,
+    });
+    if (error) throw new Error(`persist_extraction_candidates RPC: ${error.message}`);
     return data as Record<string, unknown>;
   }
 }

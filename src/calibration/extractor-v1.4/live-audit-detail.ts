@@ -9,7 +9,7 @@ import {
 } from './entity-mention-match.js';
 import type { V14CalibrationExpectations } from './fixed-calibration-expectations.js';
 import { V14_LIVE_VARIATIONS } from './live-variations.js';
-import { ClarificationManagerV2Service } from '../../services/clarification-manager-v2.service.js';
+import { classifyClarifications, type ClassifiedClarificationV2 } from '../../types/clarification-types.js';
 import { MemoryCompilerV2Service } from '../../services/memory-compiler-v2.service.js';
 import {
   collectReferenceTextsFromExtractor,
@@ -814,7 +814,7 @@ export function recompileCapture(
   registry: RegistryEntityFixture[],
 ): {
   compiled: CompiledMemoryV2;
-  recommended: ReturnType<ClarificationManagerV2Service['recommend']>;
+  recommended: ClassifiedClarificationV2[];
   resolverResult: MemoryResolverResult;
 } {
   const resolver = new ReferenceResolverService(registry);
@@ -826,20 +826,7 @@ export function recompileCapture(
     effectiveInput: capture.effective_input,
     resolverResult,
   });
-  const clarificationManager = new ClarificationManagerV2Service();
-  const recommended = clarificationManager.recommend({
-    llmCandidates: compiled.clarificationCandidates.filter((c) => c.source === 'llm'),
-    compilerCandidates: compiled.clarificationCandidates.filter((c) => c.source !== 'llm'),
-    resolverResult,
-    flags: compiled.flags,
-    extractorOutput: capture.extractor_output,
-    compiled: {
-      tasks: compiled.tasks,
-      assertions: compiled.assertions,
-      events: compiled.events,
-    },
-    effectiveInput: capture.effective_input,
-  });
+  const recommended = classifyClarifications(compiled.clarificationCandidates).blocking;
   return { compiled, recommended, resolverResult };
 }
 

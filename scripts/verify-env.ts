@@ -220,6 +220,13 @@ async function checkExtractionRunRpcs(supabase: SupabaseClient): Promise<void> {
     },
     { name: 'promote_extraction_run', args: { p_run_id: probeRunId } },
     { name: 'fail_extraction_run', args: { p_run_id: probeRunId, p_error: 'verify-env probe' } },
+    {
+      name: 'persist_extraction_candidates',
+      args: {
+        p_inbox_item_id: probeInboxId,
+        p_extraction_run_id: probeRunId,
+      },
+    },
   ];
 
   for (const { name, args } of probes) {
@@ -597,10 +604,6 @@ try {
 
 console.log('OK: variáveis carregadas');
 console.log('  SUPABASE_URL:', env.SUPABASE_URL);
-console.log(
-  '  GREENFIELD_SCHEMA:',
-  process.env.GREENFIELD_SCHEMA === 'true' ? 'true' : 'false (defina true após apply-greenfield)',
-);
 
 const res = await fetch(`${env.SUPABASE_URL.replace(/\/$/, '')}/rest/v1/`, {
   headers: {
@@ -641,6 +644,5 @@ if (geniusSeed) {
   console.warn('WARN: seed Genius ausente — db:apply-greenfield-schema inclui seeds');
 }
 
-console.log('\nTudo certo (greenfield v2). Homologação:');
-console.log('  GREENFIELD_SCHEMA=true EXTRACTOR_V14_SHADOW_ENABLED=true PERSIST_COMPILED_MEMORY_V2=true');
+console.log('\nTudo certo (pipeline v14 unificado). Homologação:');
 console.log('  npm run dev && npm run test:e2e:smoke');

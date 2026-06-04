@@ -6,7 +6,7 @@ import {
   matchesMustNotEntityMention,
 } from './entity-mention-match.js';
 import type { V14CalibrationExpectations } from './fixed-calibration-expectations.js';
-import type { ClarificationManagerV2Result } from '../../services/clarification-manager-v2.service.js';
+import type { ClarificationManagerV2Result } from '../../types/clarification-types.js';
 import type { V14CaseEvaluationResult } from './evaluate-v2-case.js';
 import { auditNegation } from './live-audit-detail.js';
 import { ratioOrNull } from './metric-ratio.js';

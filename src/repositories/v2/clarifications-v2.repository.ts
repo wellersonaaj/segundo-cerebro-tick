@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { ClassifiedClarificationV2 } from '../../services/clarification-manager-v2.service.js';
+import type { ClassifiedClarificationV2 } from '../../types/clarification-types.js';
 import { normalizeText } from '../../utils/normalize.js';
 
 export class ClarificationsV2Repository {

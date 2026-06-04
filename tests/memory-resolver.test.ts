@@ -11,7 +11,9 @@ function mockEntity(overrides: Partial<Entity>): Entity {
     entity_type: overrides.entity_type ?? 'company',
     normalized_name: overrides.normalized_name ?? 'genius hotels',
     status: 'active',
+    registry_status: 'active' as const,
     superseded_by: null,
+    created_by_extraction_run_id: null,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
