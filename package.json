@@ -29,6 +29,7 @@
     "bootstrap:controlled": "tsx scripts/run-controlled-bootstrap.ts",
     "test:external-action:classification": "tsx scripts/run-external-action-classification.ts",
     "test:pipeline:smoke": "tsx scripts/pipeline-smoke-test.ts",
+    "test:homolog:memory-reference": "tsx scripts/homolog-memory-reference-smoke.ts",
     "test:compiler:calibration": "tsx scripts/run-memory-compiler-calibration.ts",
     "promote:live-captures": "tsx scripts/promote-live-captures.ts",
     "audit:live-variability": "tsx scripts/audit-live-variability-detail.ts",

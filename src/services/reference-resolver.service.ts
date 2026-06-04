@@ -35,6 +35,14 @@ const GENERIC_TERMS = new Set(
   ['fornecedor', 'cliente', 'prazo', 'ip', 'responsavel', 'responsável'].map(normalizeText),
 );
 
+function dedupeCandidatesByEntity(candidates: ResolutionCandidate[]): ResolutionCandidate[] {
+  const byId = new Map<string, ResolutionCandidate>();
+  for (const c of candidates) {
+    byId.set(c.entity_id, c);
+  }
+  return [...byId.values()];
+}
+
 function tokenMatch(reference: string, candidate: string): boolean {
   const r = normalizeText(reference);
   const c = normalizeText(candidate);
@@ -94,6 +102,42 @@ export class ReferenceResolverService {
 
     const candidates: ResolutionCandidate[] = [];
 
+    // Global alias label (ex.: seed "Genius" → Genius Hotels) wins over homonym entity names.
+    for (const e of this.entities) {
+      for (const alias of e.aliases) {
+        if (normalizeText(alias) === norm) {
+          candidates.push({
+            entity_id: e.id,
+            canonical_name: e.name,
+            match_type: 'exact_alias',
+          });
+        }
+      }
+    }
+
+    const aliasOnly = dedupeCandidatesByEntity(candidates);
+    if (aliasOnly.length === 1) {
+      const c = aliasOnly[0]!;
+      return {
+        reference_text: referenceText,
+        status: 'resolved',
+        entity_id: c.entity_id,
+        canonical_name: c.canonical_name,
+        candidates: aliasOnly,
+        confidence: 0.95,
+      };
+    }
+    if (aliasOnly.length > 1) {
+      return {
+        reference_text: referenceText,
+        status: 'ambiguous',
+        entity_id: null,
+        canonical_name: null,
+        candidates: aliasOnly,
+        confidence: 0.5,
+      };
+    }
+
     for (const e of this.entities) {
       if (tokenMatch(referenceText, e.name)) {
         candidates.push({
@@ -103,6 +147,7 @@ export class ReferenceResolverService {
         });
       }
       for (const alias of e.aliases) {
+        if (normalizeText(alias) === norm) continue;
         if (tokenMatch(referenceText, alias)) {
           candidates.push({
             entity_id: e.id,
@@ -113,11 +158,7 @@ export class ReferenceResolverService {
       }
     }
 
-    const byId = new Map<string, ResolutionCandidate>();
-    for (const c of candidates) {
-      byId.set(c.entity_id, c);
-    }
-    const uniq = [...byId.values()];
+    const uniq = dedupeCandidatesByEntity(candidates);
 
     if (uniq.length === 1) {
       const c = uniq[0]!;

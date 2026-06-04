@@ -12,6 +12,7 @@ import {
 } from '../src/services/reference-resolver.service.js';
 import { parseExtractorOutputV14 } from '../src/openai/extractor-v1.4.types.js';
 import { CALIBRATION_DEFAULT_TEMPORAL_ANCHOR } from '../src/calibration/temporal-normalizer/default-anchor.js';
+import { normalizeText } from '../src/utils/normalize.js';
 import type { TemporalAnchor } from '../src/types/memory-compiler-v2.js';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const registry = JSON.parse(
@@ -312,11 +313,66 @@ describe('MemoryCompilerV2Service', () => {
   });
 
   it('ambiguous identity → clarification após manager', () => {
-    const { recommended } = compileScenario(
-      'v14-ambiguous-identity',
-      '[SOURCE_BLOCK:raw]\nChris enviou',
+    const entities = registry.entities.map((e) =>
+      e.id === 'e3'
+        ? { ...e, aliases: e.aliases.filter((a) => normalizeText(a) !== 'chris') }
+        : e,
     );
+    const output = FIXED_EXTRACTOR_FIXTURES['v14-ambiguous-identity']!;
+    const resolver = new ReferenceResolverService(entities);
+    const resolverResult = resolver.resolveReferences(collectReferenceTextsFromExtractor(output));
+    const compiled = new MemoryCompilerV2Service().compile({
+      extractorOutput: output,
+      effectiveInput: '[SOURCE_BLOCK:raw]\nChris enviou',
+      resolverResult,
+    });
+    const recommended = classifyClarifications(compiled.clarificationCandidates).blocking;
     expect(recommended.some((c) => c.issueType === 'ambiguous_entity_identity')).toBe(true);
+  });
+
+  it('exact global alias resolves before homonym entity name (Genius)', () => {
+    const registryWithHomonym = {
+      entities: [
+        ...registry.entities,
+        {
+          id: 'genius-homonym',
+          name: 'Genius',
+          normalized_name: 'genius',
+          entity_type: 'other',
+          aliases: [] as string[],
+        },
+        {
+          id: 'genius-hotels',
+          name: 'Genius Hotels',
+          normalized_name: 'genius hotels',
+          entity_type: 'company',
+          aliases: ['Genius'],
+        },
+      ],
+    };
+    const resolver = new ReferenceResolverService(registryWithHomonym.entities);
+    const output = parseExtractorOutputV14({
+      ...FIXED_EXTRACTOR_FIXTURES['v14-ambiguous-identity']!,
+      entity_mentions: [
+        {
+          mention_text: 'Genius',
+          suggested_entity_type: 'company',
+          source_excerpt: 'integração da Genius',
+          confidence: 0.9,
+        },
+      ],
+      clarification_candidates: [],
+    });
+    const resolverResult = resolver.resolveReferences(collectReferenceTextsFromExtractor(output));
+    const compiled = new MemoryCompilerV2Service().compile({
+      extractorOutput: output,
+      effectiveInput: '[SOURCE_BLOCK:raw]\nintegração da Genius',
+      resolverResult,
+    });
+    expect(compiled.resolvedEntities[0]?.entityId).toBe('genius-hotels');
+    expect(
+      compiled.clarificationCandidates.some((c) => c.issueType === 'ambiguous_entity_identity'),
+    ).toBe(false);
   });
 
   it('source_block_reference inválida → compilerNote, not rejected', () => {

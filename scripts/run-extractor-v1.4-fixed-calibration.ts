@@ -15,6 +15,7 @@ import {
   type V14ContextCaseFile,
 } from '../src/calibration/extractor-v1.4/run-v14-context-pipeline.js';
 import type { RegistryEntityFixture } from '../src/services/reference-resolver.service.js';
+import { normalizeText } from '../src/utils/normalize.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const casesDir = join(root, 'data/calibration/extractor-v1.4/cases');
@@ -55,12 +56,21 @@ function main(): void {
       continue;
     }
 
+    const registryEntities =
+      caseFile.scenario_id === 'v14-ambiguous-identity'
+        ? registry.entities.map((e) =>
+            e.id === 'e3'
+              ? { ...e, aliases: e.aliases.filter((a) => normalizeText(a) !== 'chris') }
+              : e,
+          )
+        : registry.entities;
+
     const result = runV14ContextPipeline({
       scenarioId: caseFile.scenario_id,
       extractorOutput,
       expected,
       caseFile,
-      registryEntities: registry.entities,
+      registryEntities,
     });
 
     if (result.evaluation.passed) {

@@ -10,6 +10,7 @@ import type { ClarificationManagerV2Result } from '../types/clarification-types.
 import { isMvpAutoRegistryEntityType, isMvpBlockedGenericEntityTerm } from '../config/mvp-registry-policy.js';
 import type { PersistenceV2Result } from '../types/domain-v2.js';
 import { normalizeText } from '../utils/normalize.js';
+import { EntitiesRepository } from '../repositories/entities.repository.js';
 import { ExtractionRunRpcV2Repository, type PersistExtractionCandidatesV2Input } from '../repositories/v2/extraction-run-rpc-v2.repository.js';
 import { dueAtColumnsFromTemporal } from '../types/domain-v2.js';
 
@@ -39,11 +40,37 @@ function asEntityType(value: string): EntityType {
   return ENTITY_TYPES.has(value as EntityType) ? (value as EntityType) : 'other';
 }
 
+function isRegistryEntityId(value: string | null | undefined): value is string {
+  return typeof value === 'string' && /^[0-9a-f-]{36}$/i.test(value);
+}
+
+/** RPC casts occurred_at to timestamptz — literals como "segunda-feira" devem ir como null. */
+function occurredAtForRpc(value: string | null | undefined): string | null {
+  if (!value?.trim()) return null;
+  const ms = Date.parse(value);
+  if (Number.isNaN(ms)) return null;
+  return new Date(ms).toISOString();
+}
+
 export class PersistenceV2Service {
   private readonly rpc: ExtractionRunRpcV2Repository;
+  private readonly entitiesRepo: EntitiesRepository;
 
   constructor(db: SupabaseClient) {
     this.rpc = new ExtractionRunRpcV2Repository(db);
+    this.entitiesRepo = new EntitiesRepository(db);
+  }
+
+  private async resolveRegistryEntityId(
+    key: string,
+    entityIds: Map<string, string>,
+    directId: string | null | undefined,
+  ): Promise<string | null> {
+    if (directId) return directId;
+    const fromResolver = entityIds.get(key);
+    if (isRegistryEntityId(fromResolver)) return fromResolver;
+    const aliasOwner = await this.entitiesRepo.findAliasOwnerAny(key);
+    return aliasOwner?.entityId ?? null;
   }
 
   async persistCandidates(input: PersistCompiledMemoryV2Input): Promise<PersistenceV2Result> {
@@ -74,7 +101,7 @@ export class PersistenceV2Service {
       if (isMvpBlockedGenericEntityTerm(mention.mentionText)) continue;
 
       const key = normalizeText(mention.mentionText);
-      let entityId = mention.entityId ?? entityIds.get(key) ?? null;
+      let entityId = await this.resolveRegistryEntityId(key, entityIds, mention.entityId);
 
       if (!entityId) {
         const entityType = asEntityType(mention.suggestedEntityType);
@@ -83,7 +110,8 @@ export class PersistenceV2Service {
           entity_type: entityType,
           normalized_name: key,
         });
-        entityIds.set(key, mention.mentionText);
+      } else {
+        entityIds.set(key, entityId);
       }
 
       resolvedEntityNames.add(mention.mentionText);
@@ -94,6 +122,10 @@ export class PersistenceV2Service {
     for (const mention of compiled.resolvedEntities) {
       if (!isMvpAutoRegistryEntityType(mention.suggestedEntityType)) continue;
       if (isMvpBlockedGenericEntityTerm(mention.mentionText)) continue;
+
+      const key = normalizeText(mention.mentionText);
+      const entityId = await this.resolveRegistryEntityId(key, entityIds, mention.entityId);
+      if (entityId) entityIds.set(key, entityId);
 
       rpcInboxItemEntities.push({
         entity_name: mention.mentionText,
@@ -108,7 +140,8 @@ export class PersistenceV2Service {
     for (const alias of compiled.aliases) {
       const targetKey = normalizeText(alias.targetReference);
       let targetEntityId =
-        alias.targetEntityId ?? entityIds.get(targetKey) ?? entityIds.get(normalizeText(alias.alias));
+        (await this.resolveRegistryEntityId(targetKey, entityIds, alias.targetEntityId)) ??
+        (await this.resolveRegistryEntityId(normalizeText(alias.alias), entityIds, null));
 
       if (!targetEntityId) {
         rpcEntities.push({
@@ -116,7 +149,9 @@ export class PersistenceV2Service {
           entity_type: 'person',
           normalized_name: targetKey,
         });
-        entityIds.set(targetKey, alias.targetReference);
+      } else {
+        entityIds.set(targetKey, targetEntityId);
+        entityIds.set(normalizeText(alias.alias), targetEntityId);
       }
 
       rpcAliases.push({
@@ -145,7 +180,7 @@ export class PersistenceV2Service {
       rpcEvents.push({
         event_kind: event.eventKind,
         title: event.title,
-        occurred_at: event.occurredAt,
+        occurred_at: occurredAtForRpc(event.occurredAt),
         episodic_confidence: event.episodicConfidence,
         source_excerpt: event.sourceExcerpt,
         source_block_ref: event.sourceBlockReference,
@@ -249,18 +284,11 @@ export class PersistenceV2Service {
       });
     }
 
-    // Ensure all referenced entity names are in the entities list
+    // Resolve registry IDs for event/task references (do not mint type=other entities by default).
     for (const name of resolvedEntityNames) {
       const key = normalizeText(name);
-      if (!entityIds.has(key)) continue;
-      const alreadyInRpc = rpcEntities.some((e) => e.normalized_name === key);
-      if (!alreadyInRpc) {
-        rpcEntities.push({
-          name,
-          entity_type: 'other',
-          normalized_name: key,
-        });
-      }
+      const resolvedId = await this.resolveRegistryEntityId(key, entityIds, entityIds.get(key));
+      if (resolvedId) entityIds.set(key, resolvedId);
     }
 
     // Deduplicate entities by normalized_name

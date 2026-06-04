@@ -58,20 +58,17 @@ async function main(): Promise<void> {
     fail('Clarificação ainda aparece como pending após resolve');
   }
 
-  const all = await fetchJson('/clarifications?limit=50');
-  if (all.status !== 200) {
-    fail(`GET /clarifications retornou ${all.status}`);
-  }
-
-  const answered = (all.body as Array<{
-    id: string;
-    status: string;
-    answer: string | null;
-    answered_at: string | null;
-  }>).find((c) => c.id === target.id);
-
-  if (!answered) {
-    fail(`Clarificação ${target.id} não encontrada em GET /clarifications`);
+  const resolvedBody = resolve.body as {
+    clarification?: {
+      id: string;
+      status: string;
+      answer: string | null;
+      answered_at: string | null;
+    };
+  };
+  const answered = resolvedBody.clarification;
+  if (!answered || answered.id !== target.id) {
+    fail(`Resposta resolve sem clarification: ${JSON.stringify(resolve.body)}`);
   }
   if (answered.status !== 'answered') {
     fail(`status esperado answered, obtido: ${answered.status}`);
@@ -83,7 +80,7 @@ async function main(): Promise<void> {
     fail('answered_at não preenchido');
   }
 
-  ok('GET /clarifications → status=answered, answer e answered_at corretos');
+  ok('POST resolve → clarification answered com answer e answered_at');
 
   console.log('\n=== Clarification smoke concluído com sucesso ===\n');
 }

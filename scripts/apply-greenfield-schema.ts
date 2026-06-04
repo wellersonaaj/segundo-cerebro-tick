@@ -25,6 +25,7 @@ const MIGRATIONS = [
   '20260602100002_greenfield_seeds.sql',
   '20260603120000_s1_simplify_promote_blocking_scope.sql',
   '20260603130000_s2_external_action_no_promote_block.sql',
+  '20260604000001_persist_rpc_indexes.sql',
   '20260604000000_persist_extraction_candidates.sql',
 ] as const;
 
@@ -34,6 +35,7 @@ const MIGRATION_LABELS: Record<(typeof MIGRATIONS)[number], string> = {
   '20260602100002_greenfield_seeds.sql': 'seeds applied',
   '20260603120000_s1_simplify_promote_blocking_scope.sql': 'S1 promote blocking_scope applied',
   '20260603130000_s2_external_action_no_promote_block.sql': 'S2 external_action no promote block applied',
+  '20260604000001_persist_rpc_indexes.sql': 'persist RPC indexes applied',
   '20260604000000_persist_extraction_candidates.sql': 'persist_extraction_candidates RPC applied',
 };
 

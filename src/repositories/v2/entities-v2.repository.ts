@@ -98,7 +98,6 @@ export class EntitiesV2Repository {
         const { data: existing } = await this.db
           .from('entity_aliases')
           .select('id, normalized_alias')
-          .eq('entity_id', entityId)
           .eq('normalized_alias', normalized_alias)
           .in('registry_status', ['active', 'candidate'])
           .maybeSingle();

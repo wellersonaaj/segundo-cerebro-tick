@@ -49,13 +49,81 @@ begin
     do update set updated_at = now();
   end loop;
 
-  -- Build entity_id lookup map by normalized_name
+  -- Build entity_id lookup map for every entity name referenced in the payload (incl. registry active)
   select jsonb_object_agg(e.normalized_name, e.id)
   into v_entity_ids
   from entities e
-  where e.normalized_name in (
-    select (jsonb_array_elements(p_entities) ->> 'normalized_name')
-  );
+  where e.registry_status in ('active', 'candidate')
+    and e.normalized_name in (
+      select distinct norm from (
+        select (elem ->> 'normalized_name') as norm
+        from jsonb_array_elements(p_entities) elem
+        where (elem ->> 'normalized_name') is not null
+        union
+        select normalize_text(x.entity_name)
+        from jsonb_to_recordset(p_inbox_item_entities) as x(
+          entity_name text, relation_type text, source_excerpt text, source_block_ref text, confidence numeric
+        )
+        where x.entity_name is not null
+        union
+        select normalize_text(x.target_entity_name)
+        from jsonb_to_recordset(p_aliases) as x(
+          target_entity_name text, alias text, source_excerpt text, source_block_ref text, confidence numeric
+        )
+        where x.target_entity_name is not null
+        union
+        select normalize_text(link.entity_name)
+        from jsonb_to_recordset(p_events) as ev(
+          event_kind text, title text, occurred_at text, episodic_confidence numeric,
+          source_excerpt text, source_block_ref text, confidence numeric, related_entities jsonb
+        )
+        cross join lateral jsonb_to_recordset(ev.related_entities) as link(
+          entity_name text, relation_type text, role text, resolution_status text
+        )
+        where link.entity_name is not null
+        union
+        select normalize_text(x.subject_entity_name)
+        from jsonb_to_recordset(p_assertions) as x(
+          assertion_kind text, subject_ref text, subject_entity_name text, predicate text,
+          object_ref text, value_text text, source_excerpt text, source_block_ref text,
+          confidence numeric, related_entity_refs jsonb
+        )
+        where x.subject_entity_name is not null
+        union
+        select normalize_text(ref.value)
+        from jsonb_to_recordset(p_assertions) as x(
+          assertion_kind text, subject_ref text, subject_entity_name text, predicate text,
+          object_ref text, value_text text, source_excerpt text, source_block_ref text,
+          confidence numeric, related_entity_refs jsonb
+        )
+        cross join lateral jsonb_array_elements_text(coalesce(x.related_entity_refs, '[]'::jsonb)) ref(value)
+        union
+        select normalize_text(x.assignee_entity_name)
+        from jsonb_to_recordset(p_task_mutations) as x(
+          operation text, task_ref text, title text, task_kind text, status_signal text,
+          assignee_entity_name text, project_entity_name text, blocked_reason text,
+          source_excerpt text, source_block_ref text, confidence numeric, task_id uuid,
+          context_resolution_evidence jsonb, due_at_literal text, due_at_local_date text,
+          due_at_local_time text, due_at_instant text, due_at_timezone text, due_at_precision text,
+          due_at_status text, due_at_reason_code text, due_at_normalizer_version text,
+          due_at_implicit_year boolean, due_at_implicit_month boolean
+        )
+        where x.assignee_entity_name is not null
+        union
+        select normalize_text(x.project_entity_name)
+        from jsonb_to_recordset(p_task_mutations) as x(
+          operation text, task_ref text, title text, task_kind text, status_signal text,
+          assignee_entity_name text, project_entity_name text, blocked_reason text,
+          source_excerpt text, source_block_ref text, confidence numeric, task_id uuid,
+          context_resolution_evidence jsonb, due_at_literal text, due_at_local_date text,
+          due_at_local_time text, due_at_instant text, due_at_timezone text, due_at_precision text,
+          due_at_status text, due_at_reason_code text, due_at_normalizer_version text,
+          due_at_implicit_year boolean, due_at_implicit_month boolean
+        )
+        where x.project_entity_name is not null
+      ) names
+      where norm is not null and norm <> ''
+    );
 
   if v_entity_ids is null then
     v_entity_ids := '{}'::jsonb;
@@ -66,6 +134,10 @@ begin
     entity_name text, relation_type text, source_excerpt text, source_block_ref text, confidence numeric
   )
   loop
+    if (v_entity_ids ->> normalize_text(v_ie.entity_name)) is null then
+      continue;
+    end if;
+
     insert into inbox_item_entities (
       inbox_item_id, extraction_run_id, entity_id, relation_type,
       source_excerpt, source_block_reference, confidence,
@@ -85,23 +157,34 @@ begin
     source_block_ref text, confidence numeric
   )
   loop
+    if (v_entity_ids ->> normalize_text(v_alia.target_entity_name)) is null then
+      continue;
+    end if;
+
     insert into entity_aliases (
       entity_id, alias, normalized_alias, registry_status, created_by_extraction_run_id
     ) values (
       ((v_entity_ids ->> normalize_text(v_alia.target_entity_name))::uuid),
       v_alia.alias, normalize_text(v_alia.alias), 'candidate', p_extraction_run_id
     )
-    on conflict (entity_id, normalized_alias) where registry_status in ('active', 'candidate')
-    do update set updated_at = now()
-    returning id into v_alias_id;
+    on conflict (normalized_alias) where registry_status in ('active', 'candidate')
+    do nothing;
 
-    insert into entity_alias_evidences (
-      entity_alias_id, inbox_item_id, extraction_run_id,
-      source_excerpt, source_block_reference, confidence, record_status
-    ) values (
-      v_alias_id, p_inbox_item_id, p_extraction_run_id,
-      v_alia.source_excerpt, v_alia.source_block_ref, v_alia.confidence, 'candidate'
-    ) on conflict (entity_alias_id, extraction_run_id, source_excerpt) do nothing;
+    -- Global uniqueness (idx_entity_aliases_normalized_active_candidate): owner may differ from target entity.
+    select id into v_alias_id
+    from entity_aliases
+    where normalized_alias = normalize_text(v_alia.alias)
+      and registry_status in ('active', 'candidate');
+
+    if v_alias_id is not null then
+      insert into entity_alias_evidences (
+        entity_alias_id, inbox_item_id, extraction_run_id,
+        source_excerpt, source_block_reference, confidence, record_status
+      ) values (
+        v_alias_id, p_inbox_item_id, p_extraction_run_id,
+        v_alia.source_excerpt, v_alia.source_block_ref, v_alia.confidence, 'candidate'
+      ) on conflict (entity_alias_id, extraction_run_id, source_excerpt) do nothing;
+    end if;
   end loop;
 
   -- 4. Insert events + event_entities
@@ -117,8 +200,13 @@ begin
       confidence, correction_id, record_status
     ) values (
       p_inbox_item_id, p_extraction_run_id, v_ev.event_kind, v_ev.title,
-      case when v_ev.occurred_at is not null and v_ev.occurred_at != ''
-           then v_ev.occurred_at::timestamptz else null end,
+      case
+        when v_ev.occurred_at is not null
+         and v_ev.occurred_at != ''
+         and v_ev.occurred_at ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
+        then v_ev.occurred_at::timestamptz
+        else null
+      end,
       v_ev.episodic_confidence, v_ev.source_excerpt, v_ev.source_block_ref,
       v_ev.confidence, p_correction_id, 'candidate'
     )
@@ -271,7 +359,7 @@ begin
     ) values (
       p_inbox_item_id, p_extraction_run_id,
       v_cl.target_type, v_cl.target_reference,
-      normalize_text(v_cl.target_reference),
+      normalize_text(coalesce(v_cl.target_reference, '')),
       v_cl.issue_type, v_cl.question, v_cl.reason,
       v_cl.priority, v_cl.blocking_scope, v_cl.materiality,
       v_cl.suggested_answers,
