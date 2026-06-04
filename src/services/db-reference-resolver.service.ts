@@ -10,6 +10,8 @@ import {
 } from './reference-resolver.service.js';
 import type { ExtractorOutputV14 } from '../openai/extractor-v1.4.types.js';
 import { applyFirstPersonPronounToResolverResult } from './first-person-pronoun-resolver.js';
+import { applyThreadPronounCoreference } from './pronoun-coreference.service.js';
+import type { ThreadConversationContext } from './thread-conversation-context.service.js';
 import { normalizeText } from '../utils/normalize.js';
 
 export class DbReferenceResolverService {
@@ -19,6 +21,7 @@ export class DbReferenceResolverService {
     output: ExtractorOutputV14,
     entityLike: EntityLikeSourceMetadata = {},
     sourceMode: SourceMode = 'conversational',
+    threadContext: ThreadConversationContext | null = null,
   ): Promise<MemoryResolverResult> {
     const registry = await this.loadRegistrySnapshot();
     const resolver = new ReferenceResolverService(registry);
@@ -35,6 +38,7 @@ export class DbReferenceResolverService {
         : null;
 
     result = applyFirstPersonPronounToResolverResult(result, sourceMode, senderResolved);
+    result = applyThreadPronounCoreference(result, sourceMode, threadContext);
     return result;
   }
 

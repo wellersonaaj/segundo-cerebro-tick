@@ -27,6 +27,15 @@ import {
 } from './external-knowledge-enrichment.service.js';
 import { createWebSearchProvider } from './web-search/tavily-provider.js';
 import { MockWebSearchProvider } from './web-search/web-search-provider.js';
+import { ThreadConversationContextService, prependThreadContextToEffectiveInput } from './thread-conversation-context.service.js';
+import {
+  applyImplicitAssigneeToOutput,
+  suppressPronounClarifications,
+} from './implicit-assignee.service.js';
+import {
+  collectResolvedThreadPronouns,
+  isThirdPersonObjectPronoun,
+} from './pronoun-coreference.service.js';
 
 export interface ExtractorV14CompileResult {
   output: ExtractorOutputV14;
@@ -49,6 +58,7 @@ export class ExtractorV14CompileService {
   private readonly taskResolver = new TaskContextResolverService();
   private readonly contextSelector = new IngestionContextSelectorService();
   private readonly enrichmentService = new ExternalKnowledgeEnrichmentService();
+  private readonly threadContextService: ThreadConversationContextService;
 
   constructor(
     db: SupabaseClient,
@@ -57,6 +67,7 @@ export class ExtractorV14CompileService {
     this.correctionsRepo = new CorrectionsRepository(db);
     this.clarificationsRepo = new ClarificationsRepository(db);
     this.dbResolver = new DbReferenceResolverService(db);
+    this.threadContextService = new ThreadConversationContextService(db);
   }
 
   async buildEffectiveInput(inboxItem: InboxItem): Promise<string> {
@@ -79,22 +90,39 @@ export class ExtractorV14CompileService {
   }
 
   async compileFromInbox(inboxItem: InboxItem): Promise<ExtractorV14CompileResult> {
-    const effectiveInput = await this.buildEffectiveInput(inboxItem);
+    const threadContext = await this.threadContextService.buildForInbox(inboxItem);
+    const baseEffectiveInput = await this.buildEffectiveInput(inboxItem);
+    const effectiveInput = prependThreadContextToEffectiveInput(baseEffectiveInput, threadContext);
     const fullContext = buildIngestionContextFromInboxItem(inboxItem);
+    const sourceMode = inboxItem.source_mode as SourceMode;
 
-    const output = await this.extractV14({
+    let output = await this.extractV14({
       effective_input: effectiveInput,
       source_channel: inboxItem.source_channel,
-      source_mode: inboxItem.source_mode as SourceMode,
+      source_mode: sourceMode,
       received_at: inboxItem.received_at,
       timezone: inboxItem.timezone,
     });
 
-    const resolverResult = await this.dbResolver.resolveForExtractorOutput(
+    output = applyImplicitAssigneeToOutput(output, sourceMode, inboxItem.raw_content);
+
+    let resolverResult = await this.dbResolver.resolveForExtractorOutput(
       output,
       fullContext.sourceMetadata.entityLike,
-      inboxItem.source_mode,
+      sourceMode,
+      threadContext,
     );
+
+    const resolvedPronouns = collectResolvedThreadPronouns(resolverResult);
+    output = suppressPronounClarifications(output, resolvedPronouns);
+    if (resolvedPronouns.size) {
+      resolverResult = await this.dbResolver.resolveForExtractorOutput(
+        output,
+        fullContext.sourceMetadata.entityLike,
+        sourceMode,
+        threadContext,
+      );
+    }
     const taskSignalResolutions = this.taskResolver.resolveTaskSignals(
       output.task_signals ?? [],
       fullContext,
@@ -146,6 +174,16 @@ export class ExtractorV14CompileService {
       enrichmentAutoApplyConfidence: enrichmentOpts.autoApplyConfidence,
       enrichmentSuggestConfidence: enrichmentOpts.suggestConfidence,
     });
+
+    if (resolvedPronouns.size) {
+      compiled.clarificationCandidates = compiled.clarificationCandidates.filter(
+        (c) =>
+          !(
+            isThirdPersonObjectPronoun(c.targetReference) &&
+            resolvedPronouns.has(c.targetReference.toLowerCase())
+          ),
+      );
+    }
 
     const cmInput = {
       llmCandidates: compiled.clarificationCandidates.filter((c) => c.source === 'llm'),

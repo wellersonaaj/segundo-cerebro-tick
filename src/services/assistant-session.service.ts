@@ -9,6 +9,23 @@ export function buildAssistantThreadId(channel: 'telegram' | 'api', key: string)
   return key.startsWith('api:') ? key : `api:${key}`;
 }
 
+export function resolveThreadIdFromInbox(
+  inbox: Pick<InboxItemRow, 'metadata' | 'source_channel'>,
+): string | null {
+  const meta = inbox.metadata ?? null;
+  const assistant = meta?.assistant;
+  if (assistant && typeof assistant === 'object') {
+    const tid = (assistant as { thread_id?: unknown }).thread_id;
+    if (typeof tid === 'string' && tid.trim()) return tid;
+  }
+  const routing = (meta?.source_metadata as { routing?: { thread_reference?: string } } | undefined)
+    ?.routing;
+  if (routing?.thread_reference?.trim()) return routing.thread_reference.trim();
+  const chatId = getTelegramChatId(meta);
+  if (chatId != null) return buildAssistantThreadId('telegram', String(chatId));
+  return null;
+}
+
 export function withAssistantTurnMetadata(
   metadata: Record<string, unknown> | null | undefined,
   patch: {
@@ -51,18 +68,7 @@ export class AssistantSessionService {
   }
 
   resolveThreadId(inbox: InboxItemRow): string | null {
-    const meta = inbox.metadata ?? null;
-    const assistant = meta?.assistant;
-    if (assistant && typeof assistant === 'object') {
-      const tid = (assistant as { thread_id?: unknown }).thread_id;
-      if (typeof tid === 'string' && tid.trim()) return tid;
-    }
-    const routing = (meta?.source_metadata as { routing?: { thread_reference?: string } } | undefined)
-      ?.routing;
-    if (routing?.thread_reference?.trim()) return routing.thread_reference.trim();
-    const chatId = getTelegramChatId(meta);
-    if (chatId != null) return buildAssistantThreadId('telegram', String(chatId));
-    return null;
+    return resolveThreadIdFromInbox(inbox);
   }
 
   async listOpenTasksSnapshot(limit = 10): Promise<Task[]> {

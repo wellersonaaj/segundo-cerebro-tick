@@ -32,7 +32,8 @@ import type {
 } from './assistant-turn.types.js';
 import type { ClarificationService } from './clarification.service.js';
 import type { InboxItemProcessService } from './inbox-item-process.service.js';
-import { aggregateUncertaintyGaps } from './uncertainty-aggregator.js';
+import { aggregateUncertaintyGaps, filterPersistableEphemeralGaps } from './uncertainty-aggregator.js';
+import { persistEphemeralUncertaintyGaps } from './assistant-ephemeral-clarifications.service.js';
 export class AssistantTurnService {
   constructor(
     private readonly inboxRepo: InboxItemsRepository,
@@ -187,18 +188,39 @@ export class AssistantTurnService {
     const inbox = await this.inboxRepo.findById(inboxItemId);
     const rawContent = inbox?.raw_content ?? input.text;
 
-    const [tasks, clarifications, extractorOutput, enrichment] = await Promise.all([
+    const [tasks, clarificationsInitial, extractorOutput, enrichment] = await Promise.all([
       this.taskAuditRepo.listByInboxItem(inboxItemId),
       this.clarificationsRepo.listPendingByInboxItem(inboxItemId),
       this.loadExtractorOutput(pipelineResult.extraction_run_id),
       this.loadEnrichmentEvidence(pipelineResult.extraction_run_id),
     ]);
 
-    const gaps = aggregateUncertaintyGaps({
+    let clarifications = clarificationsInitial;
+    const sourceMode = input.channel === 'telegram' ? 'conversational' : 'passive';
+
+    let gaps = aggregateUncertaintyGaps({
       clarifications,
       extractorOutput,
       maxGaps: 2,
+      sourceMode,
     });
+
+    const ephemeral = filterPersistableEphemeralGaps(gaps);
+    if (ephemeral.length) {
+      await persistEphemeralUncertaintyGaps(
+        this.clarificationsRepo,
+        inboxItemId,
+        pipelineResult.extraction_run_id ?? null,
+        ephemeral,
+      );
+      clarifications = await this.clarificationsRepo.listPendingByInboxItem(inboxItemId);
+      gaps = aggregateUncertaintyGaps({
+        clarifications,
+        extractorOutput,
+        maxGaps: 2,
+        sourceMode,
+      });
+    }
 
     const followUp = composeFollowUpMessage({
       raw_content: rawContent,

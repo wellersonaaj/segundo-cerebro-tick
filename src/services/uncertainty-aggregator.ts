@@ -5,6 +5,15 @@ import {
   excerptHasRelativeTemporalHint,
   isPersonalMeetingEvent,
 } from './enrichment-eligibility.js';
+import {
+  isSocialCommitmentTaskSignal,
+  shouldSkipAssigneeUncertaintyGap,
+} from './implicit-assignee.service.js';
+import {
+  isThirdPersonObjectPronoun,
+} from './pronoun-coreference.service.js';
+import type { SourceMode } from '../types/domain.js';
+import type { MemoryResolverResult } from './reference-resolver.service.js';
 import { normalizeText } from '../utils/normalize.js';
 import { isTelegramPromptableClarification } from '../telegram/telegram-metadata.js';
 
@@ -49,6 +58,8 @@ export function aggregateUncertaintyGaps(input: {
   clarifications: ClarificationRequest[];
   extractorOutput?: ExtractorOutputV14 | null;
   maxGaps?: number;
+  sourceMode?: SourceMode;
+  resolverResult?: MemoryResolverResult | null;
 }): UncertaintyGap[] {
   const max = input.maxGaps ?? 2;
   const seen = new Set<string>();
@@ -63,6 +74,12 @@ export function aggregateUncertaintyGaps(input: {
 
   for (const c of input.clarifications) {
     if (!isTelegramPromptableClarification(c)) continue;
+    if (
+      isThirdPersonObjectPronoun(c.target_reference) &&
+      isPronounResolvedInRegistry(c.target_reference, input.resolverResult)
+    ) {
+      continue;
+    }
     add({
       kind: 'clarification',
       target_reference: c.target_reference,
@@ -114,9 +131,19 @@ export function aggregateUncertaintyGaps(input: {
       const missingAssignee = !task.assignee_reference?.trim();
       const missingDue = !task.due_at?.trim();
       if (missingAssignee || missingDue) {
+        if (
+          missingAssignee &&
+          (shouldSkipAssigneeUncertaintyGap(task, input.sourceMode ?? 'conversational') ||
+            isSocialCommitmentTaskSignal(task, output))
+        ) {
+          if (!missingDue) continue;
+        }
         const parts: string[] = [];
-        if (missingAssignee) parts.push('quem fica responsável');
+        if (missingAssignee && !shouldSkipAssigneeUncertaintyGap(task, input.sourceMode ?? 'conversational')) {
+          parts.push('quem fica responsável');
+        }
         if (missingDue) parts.push('qual o prazo');
+        if (!parts.length) continue;
         add({
           kind: 'assignee_or_due',
           target_reference: task.title?.trim() || task.target_reference?.trim() || 'tarefa',
@@ -145,6 +172,21 @@ export function aggregateUncertaintyGaps(input: {
 
   gaps.sort((a, b) => b.priority - a.priority);
   return gaps.slice(0, max);
+}
+
+function isPronounResolvedInRegistry(
+  reference: string,
+  resolverResult?: MemoryResolverResult | null,
+): boolean {
+  if (!resolverResult) return false;
+  const hit =
+    resolverResult.byReferenceText.get(reference) ??
+    resolverResult.byReferenceText.get(normalizeText(reference));
+  return hit?.status === 'resolved' && hit.entity_id != null;
+}
+
+export function filterPersistableEphemeralGaps(gaps: UncertaintyGap[]): UncertaintyGap[] {
+  return gaps.filter((g) => !g.clarification_id);
 }
 
 export function uncertaintyGapsToEnrichmentTriggers(
