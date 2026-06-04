@@ -136,10 +136,7 @@ begin
         ((v_entity_ids ->> normalize_text(v_link.entity_name))::uuid),
         v_link.entity_name, v_link.relation_type, v_link.role,
         coalesce(v_link.resolution_status, 'unresolved')
-      ) on conflict (event_id, relation_type,
-        coalesce(((v_entity_ids ->> normalize_text(v_link.entity_name))::uuid)::text, ''),
-        coalesce(v_link.entity_name, '')
-      ) do nothing;
+      ) on conflict on constraint uq_event_entities_event_relation_ref do nothing;
     end loop;
   end loop;
 
