@@ -1,4 +1,8 @@
 import type { ClarificationRequest } from '../types/domain.js';
+import {
+  type AnsweredClarificationSlice,
+  shouldSuppressConfirmationContradictionClarification,
+} from '../services/confirmation-clarification-policy.js';
 
 export interface TelegramClarificationState {
   active_clarification_id: string;
@@ -43,9 +47,26 @@ export function withTelegramClarificationState(
 const TELEGRAM_SCHEDULING_NOISE =
   /\b(qual\s+dia|que\s+dia|hor[aá]rio|manh[aã]\/tarde)\b/i;
 
-export function isTelegramPromptableClarification(c: ClarificationRequest): boolean {
+export function isTelegramPromptableClarification(
+  c: ClarificationRequest,
+  answered: AnsweredClarificationSlice[] = [],
+): boolean {
   if (c.status !== 'pending') return false;
   if (c.blocking_scope === 'external_action') return false;
+  if (
+    shouldSuppressConfirmationContradictionClarification(
+      {
+        issue_type: c.issue_type,
+        question: c.question,
+        reason: c.reason,
+        target_reference: c.target_reference,
+        suggested_answers: c.suggested_answers ?? [],
+      },
+      answered,
+    )
+  ) {
+    return false;
+  }
   if (c.blocking_scope === 'none') {
     if (c.issue_type === 'ambiguous_date') return false;
     if (TELEGRAM_SCHEDULING_NOISE.test(`${c.question} ${c.reason}`)) return false;

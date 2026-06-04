@@ -27,6 +27,7 @@ import {
   applyImplicitAssigneeToOutput,
   suppressPronounClarifications,
 } from './implicit-assignee.service.js';
+import { suppressStaleConfirmationContradictions } from './confirmation-clarification-policy.js';
 import {
   collectResolvedObjectPronouns,
   isThirdPersonObjectPronoun,
@@ -84,6 +85,9 @@ export class ExtractorV14CompileService {
 
   async compileFromInbox(inboxItem: InboxItem): Promise<ExtractorV14CompileResult> {
     const threadContext = await this.threadContextService.buildForInbox(inboxItem);
+    const answeredClarifications = await this.clarificationsRepo.listAnsweredByInboxItem(
+      inboxItem.id,
+    );
     const baseEffectiveInput = await this.buildEffectiveInput(inboxItem);
     const effectiveInput = prependThreadContextToEffectiveInput(baseEffectiveInput, threadContext);
     const fullContext = buildIngestionContextFromInboxItem(inboxItem);
@@ -98,6 +102,15 @@ export class ExtractorV14CompileService {
     });
 
     output = applyImplicitAssigneeToOutput(output, sourceMode, inboxItem.raw_content);
+    output = suppressStaleConfirmationContradictions(
+      output,
+      answeredClarifications.map((c) => ({
+        question: c.question,
+        answer: c.answer ?? '',
+        issue_type: c.issue_type,
+        target_reference: c.target_reference,
+      })),
+    );
 
     const resolverResult = await this.dbResolver.resolveForExtractorOutput(
       output,
@@ -133,6 +146,12 @@ export class ExtractorV14CompileService {
       compactIngestionContext: compactContext,
       taskSignalResolutions,
       temporalAnchor,
+      answeredClarifications: answeredClarifications.map((c) => ({
+        question: c.question,
+        answer: c.answer ?? '',
+        issue_type: c.issue_type,
+        target_reference: c.target_reference,
+      })),
     });
 
     if (resolvedPronouns.size) {

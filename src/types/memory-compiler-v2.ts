@@ -176,6 +176,13 @@ export interface CompiledMemoryV2 {
   enrichmentEvidence?: ExternalKnowledgeEnrichmentResult;
 }
 
+export interface AnsweredClarificationForCompile {
+  question: string;
+  answer: string;
+  issue_type: string;
+  target_reference: string;
+}
+
 export interface MemoryCompilerV2Input {
   extractorOutput: ExtractorOutputV14;
   effectiveInput: string;
@@ -187,4 +194,5 @@ export interface MemoryCompilerV2Input {
   externalEnrichment?: ExternalKnowledgeEnrichmentResult;
   enrichmentAutoApplyConfidence?: number;
   enrichmentSuggestConfidence?: number;
+  answeredClarifications?: AnsweredClarificationForCompile[];
 }

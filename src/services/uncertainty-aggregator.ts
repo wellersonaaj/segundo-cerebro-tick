@@ -16,6 +16,7 @@ import {
 import type { SourceMode } from '../types/domain.js';
 import type { MemoryResolverResult } from './reference-resolver.service.js';
 import { normalizeText } from '../utils/normalize.js';
+import type { AnsweredClarificationSlice } from './confirmation-clarification-policy.js';
 import { isTelegramPromptableClarification } from '../telegram/telegram-metadata.js';
 
 const REVIEW_HINT_PRIORITY: Record<ReviewHint['issue_type'], number> = {
@@ -62,6 +63,7 @@ export function aggregateUncertaintyGaps(input: {
   sourceMode?: SourceMode;
   resolverResult?: MemoryResolverResult | null;
   resolvedEntities?: CompiledEntityReference[] | null;
+  answeredClarifications?: AnsweredClarificationSlice[];
 }): UncertaintyGap[] {
   const max = input.maxGaps ?? 2;
   const seen = new Set<string>();
@@ -75,7 +77,7 @@ export function aggregateUncertaintyGaps(input: {
   };
 
   for (const c of input.clarifications) {
-    if (!isTelegramPromptableClarification(c)) continue;
+    if (!isTelegramPromptableClarification(c, input.answeredClarifications ?? [])) continue;
     if (
       isThirdPersonObjectPronoun(c.target_reference) &&
       isPronounResolvedInRegistry(c.target_reference, input.resolverResult)

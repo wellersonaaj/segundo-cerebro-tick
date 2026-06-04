@@ -39,6 +39,7 @@ import {
 } from '../config/mvp-registry-policy.js';
 import { isFirstPersonPronoun } from './first-person-pronoun-resolver.js';
 import { isThirdPersonObjectPronoun } from './pronoun-coreference.service.js';
+import { shouldSuppressConfirmationContradictionClarification } from './confirmation-clarification-policy.js';
 import { shouldSuppressSchedulingClarification } from './scheduling-clarification-policy.js';
 import { getBestFactForReference } from './external-knowledge-enrichment.service.js';
 import type { ExternalKnowledgeEnrichmentResult } from '../types/external-knowledge-enrichment.js';
@@ -162,7 +163,24 @@ export class MemoryCompilerV2Service {
       confidence: h.confidence,
     }));
 
+    const answeredClarifications = input.answeredClarifications ?? [];
+
     for (const c of extractorOutput.clarification_candidates) {
+      if (
+        shouldSuppressConfirmationContradictionClarification(
+          {
+            issue_type: c.issue_type,
+            question: c.question,
+            reason: c.reason,
+            target_reference: c.target_reference,
+            suggested_answers: c.suggested_answers,
+          },
+          answeredClarifications,
+        )
+      ) {
+        compilerNotes.push(`confirmation_contradiction_suppressed: ${c.target_reference}`);
+        continue;
+      }
       if (
         c.issue_type === 'ambiguous_identity' &&
         isThirdPersonObjectPronoun(c.target_reference)
@@ -1043,6 +1061,21 @@ export class MemoryCompilerV2Service {
     return { statusSignal: signal.status_signal ?? 'unknown' };
   }
 
+  private isCompilerBlockingClarification(c: CompiledClarificationCandidateV2): boolean {
+    const isKcIdentity =
+      c.blockingScope === 'knowledge_confirmation' &&
+      (c.issueType === 'ambiguous_entity_identity' ||
+        (c.issueType === 'ambiguous_entity_type' && c.priority === 'high'));
+    return (
+      c.blockingScope === 'external_action' ||
+      isKcIdentity ||
+      (c.blockingScope !== 'none' &&
+        c.blockingScope !== 'knowledge_confirmation' &&
+        c.blockingScope !== 'enrichment' &&
+        c.priority !== 'low')
+    );
+  }
+
   private computeDecision(
     clarifications: CompiledClarificationCandidateV2[],
     dropped: DroppedArtifactV2[],
@@ -1050,9 +1083,7 @@ export class MemoryCompilerV2Service {
     notes: string[],
     extractorOutput: ExtractorOutputV14,
   ): CompilerDecision {
-    const blocking = clarifications.filter(
-      (c) => c.blockingScope !== 'none' && c.priority !== 'low',
-    );
+    const blocking = clarifications.filter((c) => this.isCompilerBlockingClarification(c));
 
     if (
       blocking.some(

@@ -187,15 +187,26 @@ export class AssistantTurnService {
     const inbox = await this.inboxRepo.findById(inboxItemId);
     const rawContent = inbox?.raw_content ?? input.text;
 
-    const [tasks, clarificationsInitial, extractorOutput, enrichment, compiled] = await Promise.all([
+    const [tasks, clarificationsInitial, answeredClarifications, extractorOutput, enrichment, compiled] =
+      await Promise.all([
       this.taskAuditRepo.listByInboxItem(inboxItemId),
       this.clarificationsRepo.listPendingByInboxItem(inboxItemId),
+      this.clarificationsRepo.listAnsweredByInboxItem(inboxItemId),
       this.loadExtractorOutput(pipelineResult.extraction_run_id),
       this.loadEnrichmentEvidence(pipelineResult.extraction_run_id),
       this.loadCompiledOutput(pipelineResult.extraction_run_id),
     ]);
 
-    let clarifications = clarificationsInitial;
+    const answeredSlices = answeredClarifications.map((c) => ({
+      question: c.question,
+      answer: c.answer ?? '',
+      issue_type: c.issue_type,
+      target_reference: c.target_reference,
+    }));
+
+    let clarifications = clarificationsInitial.filter((c) =>
+      isTelegramPromptableClarification(c, answeredSlices),
+    );
     const sourceMode = input.channel === 'telegram' ? 'conversational' : 'passive';
 
     let gaps = aggregateUncertaintyGaps({
@@ -204,6 +215,7 @@ export class AssistantTurnService {
       maxGaps: 2,
       sourceMode,
       resolvedEntities: compiled?.resolvedEntities ?? null,
+      answeredClarifications: answeredSlices,
     });
 
     const ephemeral = filterPersistableEphemeralGaps(gaps, clarifications);
@@ -214,13 +226,16 @@ export class AssistantTurnService {
         pipelineResult.extraction_run_id ?? null,
         ephemeral,
       );
-      clarifications = await this.clarificationsRepo.listPendingByInboxItem(inboxItemId);
+      clarifications = (await this.clarificationsRepo.listPendingByInboxItem(inboxItemId)).filter(
+        (c) => isTelegramPromptableClarification(c, answeredSlices),
+      );
       gaps = aggregateUncertaintyGaps({
         clarifications,
         extractorOutput,
         maxGaps: 2,
         sourceMode,
         resolvedEntities: compiled?.resolvedEntities ?? null,
+        answeredClarifications: answeredSlices,
       });
     }
 
@@ -307,7 +322,14 @@ export class AssistantTurnService {
   ): Promise<void> {
     if (input.channel !== 'telegram') return;
 
-    const primary = clarifications.find((c) => isTelegramPromptableClarification(c));
+    const answered = await this.clarificationsRepo.listAnsweredByInboxItem(inboxItemId);
+    const answeredSlices = answered.map((c) => ({
+      question: c.question,
+      answer: c.answer ?? '',
+      issue_type: c.issue_type,
+      target_reference: c.target_reference,
+    }));
+    const primary = clarifications.find((c) => isTelegramPromptableClarification(c, answeredSlices));
     if (!primary || promptMessageId == null) return;
 
     const inbox = await this.inboxRepo.findById(inboxItemId);

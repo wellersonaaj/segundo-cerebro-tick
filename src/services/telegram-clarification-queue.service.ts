@@ -28,7 +28,14 @@ export class TelegramClarificationQueueService {
     );
 
     for (const c of pending) {
-      if (!isTelegramPromptableClarification(c)) continue;
+      const answered = await this.clarificationsRepo.listAnsweredByInboxItem(c.inbox_item_id);
+      const answeredSlices = answered.map((a) => ({
+        question: a.question,
+        answer: a.answer ?? '',
+        issue_type: a.issue_type,
+        target_reference: a.target_reference,
+      }));
+      if (!isTelegramPromptableClarification(c, answeredSlices)) continue;
       const inbox = inboxById.get(c.inbox_item_id);
       if (inbox) return { clarification: c, inbox };
     }

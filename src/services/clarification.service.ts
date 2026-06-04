@@ -1,5 +1,6 @@
 import { ClarificationsRepository } from '../repositories/clarifications.repository.js';
 import type { ClarificationRequest } from '../types/domain.js';
+import { expandClarificationAnswerFromOptions } from './confirmation-clarification-policy.js';
 import type { InboxItemProcessPipeline } from './inbox-item-process.service.js';
 
 export interface ResolveAndApplyResult {
@@ -30,7 +31,8 @@ export class ClarificationService {
     if (item.status !== 'pending') {
       throw new Error(`Clarification is not pending (status=${item.status})`);
     }
-    return this.repo.resolve(id, answer);
+    const normalized = expandClarificationAnswerFromOptions(answer, item.suggested_answers ?? []);
+    return this.repo.resolve(id, normalized);
   }
 
   async resolveAndApply(
@@ -39,6 +41,8 @@ export class ClarificationService {
     options: { apply?: boolean } = {},
   ): Promise<ResolveAndApplyResult> {
     const apply = options.apply !== false;
+    const item = await this.repo.findById(id);
+    if (!item) throw new Error('Clarification not found');
     const clarification = await this.resolve(id, answer);
     if (!apply || !this.v14Pipeline) {
       return {
