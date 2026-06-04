@@ -352,7 +352,7 @@ export class AssistantTurnService {
     if (!runId) return null;
     const run = await this.runsV2Repo.findById(runId);
     if (!run?.compiled_output) return null;
-    return run.compiled_output as CompiledMemoryV2;
+    return run.compiled_output as unknown as CompiledMemoryV2;
   }
 
   private async loadEnrichmentEvidence(
