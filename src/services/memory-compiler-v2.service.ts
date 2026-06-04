@@ -39,6 +39,7 @@ import {
 } from '../config/mvp-registry-policy.js';
 import { isFirstPersonPronoun } from './first-person-pronoun-resolver.js';
 import { isThirdPersonObjectPronoun } from './pronoun-coreference.service.js';
+import { shouldSuppressSchedulingClarification } from './scheduling-clarification-policy.js';
 import { getBestFactForReference } from './external-knowledge-enrichment.service.js';
 import type { ExternalKnowledgeEnrichmentResult } from '../types/external-knowledge-enrichment.js';
 import {
@@ -185,6 +186,10 @@ export class MemoryCompilerV2Service {
           compilerNotes.push(`first_person_resolved: ${c.target_reference}`);
           continue;
         }
+      }
+      if (shouldSuppressSchedulingClarification(extractorOutput, c)) {
+        compilerNotes.push(`scheduling_clarification_suppressed: ${c.target_reference}`);
+        continue;
       }
       if (
         (c.issue_type === 'ambiguous_identity' || c.issue_type === 'ambiguous_entity_type') &&

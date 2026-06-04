@@ -40,8 +40,15 @@ export function withTelegramClarificationState(
   return base;
 }
 
+const TELEGRAM_SCHEDULING_NOISE =
+  /\b(qual\s+dia|que\s+dia|hor[aá]rio|manh[aã]\/tarde)\b/i;
+
 export function isTelegramPromptableClarification(c: ClarificationRequest): boolean {
   if (c.status !== 'pending') return false;
   if (c.blocking_scope === 'external_action') return false;
+  if (c.blocking_scope === 'none') {
+    if (c.issue_type === 'ambiguous_date') return false;
+    if (TELEGRAM_SCHEDULING_NOISE.test(`${c.question} ${c.reason}`)) return false;
+  }
   return true;
 }
