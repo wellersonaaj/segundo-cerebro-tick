@@ -58,6 +58,16 @@ export class InboxItemsRepository {
     return data as InboxItemRow | null;
   }
 
+  async findBySourceReference(sourceReference: string): Promise<InboxItemRow | null> {
+    const { data, error } = await this.db
+      .from('inbox_items')
+      .select()
+      .eq('source_reference', sourceReference)
+      .maybeSingle();
+    if (error) throw new Error(`inbox_items.findBySourceReference: ${error.message}`);
+    return data as InboxItemRow | null;
+  }
+
   async listRecent(input: ListRecentInboxItemsInput = {}): Promise<InboxItemRow[]> {
     const limit = input.limit ?? 100;
     let q = this.db.from('inbox_items').select().order('received_at', { ascending: false });

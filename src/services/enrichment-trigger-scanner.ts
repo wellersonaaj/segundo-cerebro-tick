@@ -112,6 +112,43 @@ export function scanEnrichmentTriggers(
         sourceExcerpt: c.source_excerpt,
         anchorYear,
       });
+    } else if (isProperNounLike(c.target_reference)) {
+      add({
+        targetReference: c.target_reference,
+        gapKind: 'clarification_external',
+        sourceExcerpt: c.source_excerpt,
+        anchorYear,
+      });
+    }
+  }
+
+  for (const hint of output.review_hints) {
+    const ref = hint.target_reference?.trim();
+    if (!ref || !isProperNounLike(ref)) continue;
+    if (
+      hint.issue_type === 'ambiguous_identity' ||
+      hint.issue_type === 'unresolved_reference' ||
+      hint.issue_type === 'ambiguous_entity_type'
+    ) {
+      add({
+        targetReference: ref,
+        gapKind: 'clarification_external',
+        sourceExcerpt: hint.source_excerpt,
+        anchorYear,
+      });
+    }
+  }
+
+  for (const mention of output.entity_mentions) {
+    const ref = mention.mention_text.trim();
+    if (!isProperNounLike(ref)) continue;
+    if (mention.suggested_entity_type === 'other' || mention.suggested_entity_type === 'topic') {
+      add({
+        targetReference: ref,
+        gapKind: 'clarification_external',
+        sourceExcerpt: mention.source_excerpt,
+        anchorYear,
+      });
     }
   }
 

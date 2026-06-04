@@ -1,5 +1,6 @@
 import cors from '@fastify/cors';
 import Fastify from 'fastify';
+import { registerAssistantRoutes } from './api/assistant.routes.js';
 import { registerAuditRoutes } from './api/audit.routes.js';
 import { registerClarificationsRoutes } from './api/clarifications.routes.js';
 import { registerEntitiesRoutes } from './api/entities.routes.js';
@@ -25,6 +26,9 @@ import { InboxItemEntitiesRepository } from './repositories/inbox-item-entities.
 import { InboxItemsRepository } from './repositories/inbox-items.repository.js';
 import { TasksRepository } from './repositories/tasks.repository.js';
 import { TaskAuditRepository } from './repositories/task-audit.repository.js';
+import { ExtractionRunsV2Repository } from './repositories/v2/extraction-runs-v2.repository.js';
+import { AssistantSessionService } from './services/assistant-session.service.js';
+import { AssistantTurnService } from './services/assistant-turn.service.js';
 import { AuditService } from './services/audit.service.js';
 import { ClarificationService } from './services/clarification.service.js';
 import { CorrectionService, ReprocessService } from './services/correction.service.js';
@@ -38,6 +42,7 @@ export interface AppDeps {
   extract?: ExtractFn;
   inboxItemProcess?: InboxItemProcessService;
   auditService?: AuditService;
+  assistantTurn?: AssistantTurnService;
 }
 
 export async function buildApp(deps: AppDeps = {}) {
@@ -59,16 +64,27 @@ export async function buildApp(deps: AppDeps = {}) {
   const inboxItemProcess =
     deps.inboxItemProcess ??
     new InboxItemProcessService(new InboxItemsRepository(db), v14Pipeline);
-  const clarifications = new ClarificationService(
-    new ClarificationsRepository(db),
-    v14Pipeline,
-  );
+  const inboxRepo = new InboxItemsRepository(db);
+  const clarificationsRepo = new ClarificationsRepository(db);
+  const tasksRepo = new TasksRepository(db);
+  const clarifications = new ClarificationService(clarificationsRepo, v14Pipeline);
+  const assistantSession = new AssistantSessionService(inboxRepo, clarificationsRepo, tasksRepo);
+  const assistantTurn =
+    deps.assistantTurn ??
+    new AssistantTurnService(
+      inboxRepo,
+      inboxItemProcess,
+      clarificationsRepo,
+      clarifications,
+      new TaskAuditRepository(db),
+      new ExtractionRunsV2Repository(db),
+    );
   const entitiesRepo = new EntitiesRepository(db);
   const search = new MemorySearchService(
     entitiesRepo,
     new EventsRepository(db),
     new AssertionsRepository(db),
-    new TasksRepository(db),
+    tasksRepo,
     new EntityResolutionRepository(db),
     new InboxItemEntitiesRepository(db),
   );
@@ -78,26 +94,21 @@ export async function buildApp(deps: AppDeps = {}) {
     processor,
     corrections,
     reprocess,
-    inboxRepo: new InboxItemsRepository(db),
+    inboxRepo: inboxRepo,
     runsRepo: new ExtractionRunsRepository(db),
     inboxItemEntitiesRepo: new InboxItemEntitiesRepository(db),
     entitiesRepo,
   });
   await registerMemoryRoutes(app, search);
   await registerEntitiesRoutes(app, entitiesRepo, new EventsRepository(db), search);
-  await registerTasksRoutes(app, new TasksRepository(db));
+  await registerTasksRoutes(app, tasksRepo);
   await registerClarificationsRoutes(app, clarifications);
+  await registerAssistantRoutes(app, { assistantTurn, session: assistantSession });
 
   await registerInternalInboxRoutes(app, { inboxItemProcess });
 
   await registerTelegramWebhookRoutes(app, {
-    telegramInbox: new TelegramInboxService(
-      processor,
-      new InboxItemsRepository(db),
-      inboxItemProcess,
-      new ClarificationsRepository(db),
-      clarifications,
-    ),
+    telegramInbox: new TelegramInboxService(inboxRepo, assistantTurn, clarificationsRepo),
   });
 
   const auditService =

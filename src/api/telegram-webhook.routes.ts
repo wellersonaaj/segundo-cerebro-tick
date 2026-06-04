@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { getTelegramConfig } from '../config/telegram.js';
 import { parseTelegramWebhookBody } from '../telegram/parse-update.js';
-import { sendTelegramMessage } from '../telegram/telegram-bot.client.js';
+import { sendTelegramMessageSafe } from '../services/assistant-delivery.js';
 import type { TelegramInboxService } from '../services/telegram-inbox.service.js';
 import { log } from '../utils/logger.js';
 
@@ -65,28 +65,31 @@ export async function registerTelegramWebhookRoutes(
     });
 
     try {
-      const handled = await deps.telegramInbox.ingestAndNotify(capture);
+      const handled = await deps.telegramInbox.handleIncoming(capture);
       if (handled.kind === 'clarification_resolved') {
         return reply.send({
           ok: true,
           clarification_resolved: true,
+          turn_id: handled.turn_id,
           inbox_item_id: handled.inbox_item_id,
           answer: handled.answer,
         });
       }
-      return reply.status(201).send({ ok: true, ...handled.result });
+      return reply.status(202).send({
+        ok: true,
+        processing: true,
+        turn_id: handled.turn_id,
+        thread_id: handled.thread_id,
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       log('error', 'telegram_webhook', { step: 'capture_failed', error: message });
-      try {
-        await sendTelegramMessage(
-          config,
-          capture.chatId,
-          'Não consegui processar esta mensagem. Tente de novo em instantes.',
-        );
-      } catch {
-        // ignore
-      }
+      await sendTelegramMessageSafe(
+        config,
+        capture.chatId,
+        'Não consegui processar esta mensagem. Tente de novo em instantes.',
+        { step: 'error_reply' },
+      );
       return reply.status(500).send({ error: message });
     }
   });
