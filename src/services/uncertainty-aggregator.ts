@@ -60,6 +60,28 @@ function isNonEntityLiteral(ref: string): boolean {
   return false;
 }
 
+/**
+ * Tipos de entity_mention que NÃO devem virar gaps.
+ * Defesa primária: o LLM já classificou corretamente.
+ * Se o tipo é um desses, é contexto (tempo, medida, número), não entity ambígua.
+ */
+const NON_ENTITY_TYPES = new Set([
+  'temporal',
+  'time',
+  'date',
+  'datetime',
+  'duration',
+  'frequency',
+  'measurement',
+  'currency',
+  'amount',
+  'value',
+  'age',
+  'quantity',
+  'number',
+  'metric',
+]);
+
 function gapKey(kind: string, ref: string): string {
   return `${kind}:${normalizeText(ref)}`;
 }
@@ -135,6 +157,8 @@ export function aggregateUncertaintyGaps(input: {
       const ref = mention.mention_text.trim();
       if (isNonEntityLiteral(ref)) continue;
       if (!isProperNounLike(ref)) continue;
+      // Defesa primária: se o LLM já disse que NÃO é entity, respeita.
+      if (NON_ENTITY_TYPES.has(mention.suggested_entity_type)) continue;
       if (mention.suggested_entity_type === 'other' || mention.suggested_entity_type === 'topic') {
         add({
           kind: 'unresolved_entity',

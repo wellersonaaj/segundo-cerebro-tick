@@ -23,6 +23,8 @@ export const extractorV14JsonSchema = {
               'topic',
               'document',
               'location',
+              'temporal',
+              'measurement',
               'other',
             ],
           },
