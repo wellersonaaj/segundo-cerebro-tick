@@ -12,50 +12,111 @@
 
 ---
 
-## Fase 0 — Logging estruturado (já parcialmente feito)
+## Fase 0 — Logging estruturado + ALS turn context
 
-**Status:** `src/utils/structured-logger.ts` já existe e funciona. Falta plugar nos pontos existentes.
+**Status parcial:** `src/utils/structured-logger.ts` já existe. Falta: ALS pra propagar turn_id, testes do logger, shim do logger antigo, e plugar nos pontos Telegram.
 
 ### Prompt pro Cursor:
 
 ```
-Tarefa: plugar o structured logger (src/utils/structured-logger.ts) nos
-3 pontos críticos do pipeline atual. Não criar nada novo, só envolver
-as chamadas existentes.
+Tarefa: completar a Fase 0 do plano de orquestrador unificado. Quatro
+deliverables pequenos. Sem mudar lógica de negócio.
 
-Arquivos a modificar:
-1. src/api/telegram-webhook.routes.ts — na rota POST /webhooks/telegram,
-   ANTES do reply.send, adicionar:
-   const turn = startTurn({ turn_id: randomUUID(), user_id: capture.userId, chat_id: capture.chatId, message_id: capture.messageId, input: capture.text });
-   await turn.stage('parse', { output: { kind: parsed.kind, has_capture: parsed.kind === 'capture' } });
+### 1. AsyncLocalStorage pra turn_id
 
-2. src/services/telegram-inbox.service.ts — em handleIncoming:
-   - Após resolver thread: turn.stage('thread_resolve', { output: { thread_id: threadId } })
-   - Antes do tryResolveClarification: turn.stage('clarification_check', { output: { forced_new: forceNewCapture } })
-   - Passar o `turn` handle pra frente (ou usar contexto async)
+Criar src/utils/turn-context.ts:
+- import { AsyncLocalStorage } from 'node:async_hooks'
+- type TurnCtx = { turn_id: string; user_id?: number; chat_id?: number; message_id?: number; started_at: number; handle: TurnHandle }
+- const storage = new AsyncLocalStorage<TurnCtx>()
+- export function runWithTurn<T>(ctx: Omit<TurnCtx, 'handle' | 'started_at'>, fn: () => Promise<T> | T): Promise<T> | T
+- export function getCurrentTurn(): TurnCtx | null   // null quando fora de Telegram (testes, API)
+- export function requireCurrentTurn(): TurnCtx       // throw se null, pra casos onde é obrigatório
 
-3. src/services/assistant-turn.service.ts — em startCapture:
-   - Após criar o turn: turn.stage('extraction', async () => { ... envolver chamada do v14 pipeline ... })
-   - Capturar output_tokens se a resposta do extractor trouxer
+Quando getCurrentTurn() retorna null, o structured-logger continua
+funcionando: cada turn.stage() cria um turn ad-hoc com turn_id
+gerado na hora (uuid ephemeral). NUNCA quebra — só perde o tracking
+de correlação.
+
+### 2. Testes do structured-logger
+
+Criar tests/utils/structured-logger.test.ts (vitest). Cobrir:
+- startTurn + stage com função async → registra latency_ms
+- startTurn + stage com objeto estático → registra sem latency_ms
+- finish acumula cost_usd somando os stages
+- stage com throw → re-throw + entry level=error + error populado
+- estimateCostUsd com gpt-5-mini: input 1M tokens = $0.25, output 1M = $2
+- estimateCostUsd com modelo desconhecido = 0
+- escrita em LOG_DIR temporário (criar dir fake, appendFile mockado,
+  verificar que file contém JSON lines)
+
+~30 linhas de teste. Sem dependência de OpenAI real.
+
+### 3. Shim do logger antigo (migração, não coexistência)
+
+Modificar src/utils/logger.ts pra DELEGAR ao structured-logger:
+- Manter export `log(level, message, meta)` (não quebra 9 call sites)
+- Internamente: chamar getCurrentTurn(); se existe, turn.stage(message, { meta }); senão, criar entry avulsa com stage=message
+- Resultado: stdout continua igual, mas agora tudo vai pro arquivo JSONL também
+- O call site NÃO precisa mudar agora — migração dos 9 call sites vem depois (Fase 6+)
+
+### 4. Plugar turn_id no pipeline Telegram (3 arquivos)
+
+Modificar src/api/telegram-webhook.routes.ts:
+- Envolver o handleIncoming inteiro em runWithTurn:
+  await runWithTurn({ turn_id: randomUUID(), user_id: capture.userId, chat_id: capture.chatId, message_id: capture.messageId }, async () => {
+    reply.send({ ok: true, accepted: true });
+    try {
+      const handled = await deps.telegramInbox.handleIncoming(capture);
+      await getCurrentTurn()?.finish();
+    } catch (err) {
+      await logError({ turn_id: getCurrentTurn()?.turn_id, stage: 'webhook_handler', error: err });
+      await getCurrentTurn()?.finish({ error: err.message });
+    }
+  });
+- IMPORTANTE: runWithTurn precisa envolver o .then/.catch do webhook, não só o handleIncoming. Toda a cadeia async carrega o mesmo turn_id.
+
+Modificar src/services/telegram-inbox.service.ts:
+- Em handleIncoming, no início: const turn = requireCurrentTurn() (injetado via ALS)
+- Adicionar stages: turn.stage('parse', ...), turn.stage('thread_resolve', ...), turn.stage('clarification_check', ...)
+- O tryResolveClarification agora roda dentro do contexto do turn
+
+Modificar src/services/assistant-turn.service.ts:
+- Em startCapture, no início: const turn = requireCurrentTurn()
+- Envolver chamada do v14 pipeline em turn.stage('extraction', async () => { ... })
 
 NÃO mexer em:
-- Lógica de negócio (só adicionar logs)
+- Lógica de negócio (só adicionar logs, sem mudar comportamento)
 - Ordem das chamadas
 - Tratamento de erro (logs vão DENTRO dos catches existentes, não em volta)
+- O fallback null do getCurrentTurn() garante que testes que não rodam
+  via webhook continuam passando sem turn_id
 
 Aceite:
-- npm test passa 100%
+- npm test -- structured-logger passa 100% (novo)
+- npm test geral passa 100% (nada quebra)
 - Manda 1 mensagem no Telegram
-- tail -5 /tmp/cerebro-logs/$(date -u +%Y-%m-%d).jsonl | jq mostra entries com stage=parse, clarification_check, etc.
+- tail -1 /tmp/cerebro-logs/$(date -u +%Y-%m-%d).jsonl | jq mostra TODAS as entries daquela mensagem com o MESMO turn_id (grep por message_id confirma)
+- /tmp/cerebro-logs/ contém 1 entry por message_id, com ~5 stages cada (webhook_received, parse, thread_resolve, clarification_check, extraction, turn_finish)
+
+Rollback:
+- git revert <commit-fase-0>
+- Ou: INTENT_CLASSIFIER_ENABLED=false + shim do logger.ts vira no-op
 ```
 
 ### Validação:
 
 ```bash
+npm test -- structured-logger
+echo "---"
 npm test
 echo "---"
-# manda msg no Telegram
-tail -10 /tmp/cerebro-logs/$(date -u +%Y-%m-%d).jsonl | jq
+# manda 1 msg no Telegram
+sleep 2
+echo "--- entries dessa msg ---"
+MSG_ID=<pegar do Telegram>
+grep "\"message_id\":$MSG_ID" /tmp/cerebro-logs/$(date -u +%Y-%m-%d).jsonl | jq -c '{stage, turn_id, latency_ms}'
+echo "--- mesmo turn_id em todas? ---"
+grep "\"message_id\":$MSG_ID" /tmp/cerebro-logs/$(date -u +%Y-%m-%d).jsonl | jq -r .turn_id | sort -u
 ```
 
 ---
@@ -184,10 +245,11 @@ OPENAI_API_KEY=sk-... npm run test:intent:eval
 ### Prompt pro Cursor:
 
 ```
-Tarefa: criar o orquestrador que classifica e roteia, mais o handler
-de comandos.
+Tarefa: criar o orquestrador (intent → rota) e o handler de comandos.
+Inclui o wiring do intent 'update' pra modo de correção.
 
-Arquivos a criar:
+### Arquivos a criar:
+
 1. src/services/command-handler.service.ts
    - class CommandHandlerService
    - async handle(command: string, args: string[], ctx: { turn_id: string; chat_id: number; user_id: number }): Promise<{ text: string; parse_mode?: 'Markdown' }>
@@ -207,63 +269,105 @@ Arquivos a criar:
        private assistantTurn: AssistantTurnService,
        private rag: RAGPipelineService,
        private commands: CommandHandlerService,
-       private logger: StructuredLogger,
      )
    - async handle(capture: ParsedTelegramCapture): Promise<string>
    - Fluxo:
-     a. const turn = startTurn({...})
-     b. turn.stage('intent_classify', async () => ({ output: result, model, input_tokens, output_tokens }))
-     c. turn.stage('route_dispatch', { output: { intent } })
-     d. switch(intent) {
-          case 'save'|'update': return assistantTurn.startCapture(...)
-          case 'query': return rag.answer(...)
-          case 'command': return commands.handle(...)
+     a. const ctx = requireCurrentTurn()   // ALS da Fase 0
+     b. await ctx.handle.stage('intent_classify', async () => ({ output: result, model, input_tokens, output_tokens }))
+     c. await ctx.handle.stage('route_dispatch', { output: { intent: result.intent } })
+     d. switch(result.intent) {
+          case 'save':    return this.assistantTurn.startCapture({ ..., mode: 'capture' })
+          case 'update':  return this.assistantTurn.startCapture({ ..., mode: 'correction' })
+          case 'query':   return this.rag.answer(...)
+          case 'command': return this.commands.handle(...)
         }
-     e. turn.finish()
-   - Se INTENT_CLASSIFIER_ENABLED=false (env), pula o classificador e vai direto pra 'save'
+   - Se INTENT_CLASSIFIER_ENABLED=false (env), pula o classificador e assume 'save'
 
-Arquivos a modificar:
-3. src/services/telegram-inbox.service.ts
+### Arquivos a modificar (WIRING DO INTENT 'update'):
+
+3. src/services/assistant-turn.service.ts (e types em assistant-turn.types.ts)
+   - Adicionar campo `mode?: 'capture' | 'correction'` em StartCaptureInput
+   - Em startCapture, ANTES de criar inbox:
+     - Se mode === 'correction':
+       a. Buscar último inbox_item do thread_id via ThreadConversationContextService
+          (que já tem .recentMessages e tá em src/services/)
+       b. Se NÃO achar: fallback pra 'capture' com flag, ou retornar string
+          "Corrigir o quê? O thread não tem captura recente." (decide qual no teste)
+       c. Se achar: chamar this.correctionService.applyCorrection(inboxItem.id, input.text)
+          (NÃO criar inbox novo)
+     - Se mode === 'capture' (ou sem mode): fluxo atual (cria ou reusa inbox)
+   - Adicionar CorrectionService como dependência opcional no construtor
+   - Logar stage 'correction_apply' com input={inbox_id, correction_text}, output={applied: bool}
+   - IMPORTANTE: não confundir com o fluxo de clarificação Telegram
+     (tryResolveClarification, que é separado). 'update' = correção de
+     inbox item existente; 'clarification' = resposta a uma pergunta
+     pendente do extractor.
+
+4. src/services/telegram-inbox.service.ts
    - Trocar a chamada `assistantTurn.startCapture(...)` por `unifiedRouter.handle(capture)`
-   - Manter lógica de "nova:" prefix e clarification intactas
-   - Adicionar turn.stage('parse') e turn.stage('thread_resolve') nos pontos existentes
+   - Manter lógica de "nova:" prefix e o tryResolveClarification intactos
+     (clarification vem ANTES do router — é uma resposta, não um intent novo)
+   - Os stages de parse/thread_resolve/clarification_check adicionados na
+     Fase 0 continuam aqui
 
-4. src/app.ts
+5. src/app.ts
    - Construir RetrievalService, RerankService, RAGPipelineService, IntentClassifierService, CommandHandlerService, UnifiedRouterService
-   - Injetar UnifiedRouter no TelegramInboxService
+   - Injetar UnifiedRouter (substituindo assistantTurn direto) no TelegramInboxService
+   - Passar CorrectionService pra AssistantTurn no construtor
 
-5. src/config/env.ts
-   - Adicionar: INTENT_CLASSIFIER_ENABLED (default: true), INTENT_CLASSIFIER_MODEL (default: 'gpt-5-mini'), RAG_RETRIEVAL_TOP_K (default: 10), LOG_DIR (default: '/tmp/cerebro-logs')
+### NÃO MODIFICAR:
+- src/config/env.ts e .env.example: as 6 env vars (INTENT_CLASSIFIER_*,
+  RAG_*, LOG_DIR) JÁ FORAM ADICIONADAS no commit 172deb2. Não duplicar.
 
-6. .env.example
-   - Adicionar as mesmas vars com comentários
+### Testes:
 
-Testes:
-7. tests/unified-router.service.test.ts
-   - Mock classifier pra forçar cada intent
-   - Verifica que cada intent chama o handler certo
-   - Verifica que tudo é logado
+6. tests/unified-router.service.test.ts
+   - Mock classifier pra forçar cada intent (save/update/query/command)
+   - Verifica que cada intent chama o handler correto
+   - Verifica que tudo é logado (mock getCurrentTurn, contar chamadas stage())
 
-8. tests/command-handler.service.test.ts
-   - Mock filesystem com logs fake
+7. tests/command-handler.service.test.ts
+   - Mock filesystem com logs fake (criar /tmp fake, appendFile mockado)
    - Test /status, /debug, /help, /costs, /log
 
-Aceite:
-- npm test -- unified-router command-handler passa 100%
+8. tests/assistant-turn.service.test.ts (atualizar)
+   - Test mode='correction' resolve inbox_id correto via ThreadConversationContext
+   - Test mode='correction' sem alvo → fallback explícito
+   - Test mode='correction' chama CorrectionService.applyCorrection
+   - Test mode='capture' (e sem mode) mantém comportamento atual
+
+### Aceite:
+- npm test -- unified-router command-handler assistant-turn passa 100%
 - Manda "/status" no Telegram e responde com números reais
-- Manda "marquei consulta quinta 14h" → intent_classify loga intent=save
-- Manda "o que eu tenho com Breno?" → intent_classify loga intent=query, RAG responde
+- Manda "marquei consulta quinta 14h" → intent_classify=save, cria inbox novo
+- Manda "na verdade era sexta" (logo após) → intent_classify=update, APLICAR
+  correção no inbox anterior do thread (verificar com `select * from
+  inbox_items order by created_at desc limit 2` no Supabase)
+- Manda "o que eu tenho com Breno?" → intent_classify=query, RAG responde
+- O fallback null do getCurrentTurn() (Fase 0) continua funcionando —
+  testes que não rodam via ALS não quebram
+
+### Rollback:
+- INTENT_CLASSIFIER_ENABLED=false no .env → router pula classificação,
+  assume 'save' (comportamento legacy)
+- intent 'update' desativado = remover o branch no switch (volta pro
+  comportamento de sempre-criar-inbox)
+- git revert <commit-fase-3> reverte tudo
 ```
 
 ### Validação:
 
 ```bash
-npm test -- unified-router command-handler
+npm test -- unified-router command-handler assistant-turn
 echo "---"
-npm run dev   # sobe a API
+npm run dev
 echo "---"
-# manda "/status" no Telegram
-tail -5 /tmp/cerebro-logs/$(date -u +%Y-%m-%d).jsonl | jq
+# manda /status, depois "marquei consulta quinta", depois "na verdade era sexta"
+sleep 2
+tail -5 /tmp/cerebro-logs/$(date -u +%Y-%m-%d).jsonl | jq -c '{stage, intent: .output.intent, latency_ms}'
+echo "--- inbox criado vs corrigido ---"
+# no Supabase SQL editor:
+# select id, raw_content, created_at from inbox_items order by created_at desc limit 3
 ```
 
 ---
