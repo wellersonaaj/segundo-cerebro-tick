@@ -22,6 +22,7 @@ export type ExtractV14Params = {
   source_mode: string;
   received_at: string;
   timezone: string;
+  context_block?: string;
 };
 
 export type ExtractV14Fn = (params: ExtractV14Params) => Promise<ExtractorOutputV14>;

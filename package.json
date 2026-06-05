@@ -43,7 +43,8 @@
     "audit:extractor:v1.4:live": "tsx scripts/audit-extractor-v1.4-live-detail.ts",
     "mcp": "tsx src/mcp/server.ts",
     "telegram:set-webhook": "tsx scripts/telegram-set-webhook.ts",
-    "test:intent:eval": "tsx tests/intent-classifier.eval.ts"
+    "test:intent:eval": "tsx tests/intent-classifier.eval.ts",
+    "eval:pre-context": "tsx scripts/run-pre-context-eval.ts"
   },
   "engines": {
     "node": ">=20"

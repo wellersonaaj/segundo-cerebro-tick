@@ -12,6 +12,7 @@ import { ExtractionRunRpcRepository } from '../repositories/extraction-run-rpc.r
 import { ExtractionRunsV2Repository } from '../repositories/v2/extraction-runs-v2.repository.js';
 import type { ExtractionTriggerType, InboxItem } from '../types/domain.js';
 import { log } from '../utils/logger.js';
+import type { InboxItemProcessOptions } from './inbox-item-process.service.js';
 import { ExtractorV14CompileService } from './extractor-v14-compile.service.js';
 import type { InboxItemProcessPipeline } from './inbox-item-process.service.js';
 import { hashContentForShadow } from './memory-compiler.service.js';
@@ -42,17 +43,23 @@ export class ExtractionPipelineV14Service implements InboxItemProcessPipeline {
     this.inboxRepo = deps?.inboxRepo ?? new InboxItemsRepository(db);
   }
 
-  async run(inboxItem: InboxItem): Promise<{
+  async run(
+    inboxItem: InboxItem,
+    options?: InboxItemProcessOptions,
+  ): Promise<{
     inbox_item_id: string;
     processing_status: 'completed' | 'failed';
     extraction_run_id?: string;
     extractor_version?: string | null;
     needs_clarification?: boolean;
   }> {
-    return this.runWithTrigger(inboxItem, 'initial');
+    return this.runWithTrigger(inboxItem, 'initial', options);
   }
 
-  async runReprocess(inboxItemId: string): Promise<{
+  async runReprocess(
+    inboxItemId: string,
+    options?: InboxItemProcessOptions,
+  ): Promise<{
     inbox_item_id: string;
     processing_status: 'completed' | 'failed';
     extraction_run_id?: string;
@@ -61,12 +68,13 @@ export class ExtractionPipelineV14Service implements InboxItemProcessPipeline {
   }> {
     const inboxItem = await this.inboxRepo.findById(inboxItemId);
     if (!inboxItem) throw new Error('Inbox item not found');
-    return this.runWithTrigger(inboxItem, 'reprocess');
+    return this.runWithTrigger(inboxItem, 'reprocess', options);
   }
 
   async runWithTrigger(
     inboxItem: InboxItem,
     triggerType: ExtractionTriggerType,
+    options?: InboxItemProcessOptions,
   ): Promise<{
     inbox_item_id: string;
     processing_status: 'completed' | 'failed';
@@ -98,7 +106,9 @@ export class ExtractionPipelineV14Service implements InboxItemProcessPipeline {
         run_id: runId,
       });
 
-      const compiledResult = await this.compileService.compileFromInbox(inboxItem);
+      const compiledResult = await this.compileService.compileFromInbox(inboxItem, {
+        preContextBlock: options?.preContextBlock,
+      });
       const {
         output,
         compiled,

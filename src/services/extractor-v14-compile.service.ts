@@ -83,7 +83,10 @@ export class ExtractorV14CompileService {
     });
   }
 
-  async compileFromInbox(inboxItem: InboxItem): Promise<ExtractorV14CompileResult> {
+  async compileFromInbox(
+    inboxItem: InboxItem,
+    options?: { preContextBlock?: string },
+  ): Promise<ExtractorV14CompileResult> {
     const threadContext = await this.threadContextService.buildForInbox(inboxItem);
     const answeredClarifications = await this.clarificationsRepo.listAnsweredByInboxItem(
       inboxItem.id,
@@ -99,6 +102,7 @@ export class ExtractorV14CompileService {
       source_mode: sourceMode,
       received_at: inboxItem.received_at,
       timezone: inboxItem.timezone,
+      context_block: options?.preContextBlock,
     });
 
     output = applyImplicitAssigneeToOutput(output, sourceMode, inboxItem.raw_content);

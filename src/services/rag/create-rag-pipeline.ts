@@ -10,6 +10,21 @@ import { RetrievalService } from '../retrieval.service.js';
 import { VerifierService } from '../verifier.service.js';
 import { FetchOpenAiRagClient } from './openai-rag.client.js';
 
+export function createRetrievalService(deps: {
+  db?: SupabaseClient;
+  openaiApiKey?: string;
+} = {}): RetrievalService {
+  const env = loadEnv();
+  const apiKey = deps.openaiApiKey ?? env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error('OPENAI_API_KEY required for retrieval service');
+  }
+  const db = deps.db ?? getSupabase();
+  const openai = new FetchOpenAiRagClient(apiKey);
+  const embedder = new EmbedderService(openai);
+  return new RetrievalService(db, embedder);
+}
+
 export function createRagPipeline(deps: {
   db?: SupabaseClient;
   openaiApiKey?: string;

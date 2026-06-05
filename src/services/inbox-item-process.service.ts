@@ -32,9 +32,19 @@ export interface InboxItemProcessSuccess {
 }
 
 /** Wired in Checkpoint B — v1.4-only extraction pipeline. */
+export interface InboxItemProcessOptions {
+  preContextBlock?: string;
+}
+
 export interface InboxItemProcessPipeline {
-  run(inboxItem: InboxItem): Promise<Omit<InboxItemProcessSuccess, 'ok'>>;
-  runReprocess(inboxItemId: string): Promise<Omit<InboxItemProcessSuccess, 'ok'>>;
+  run(
+    inboxItem: InboxItem,
+    options?: InboxItemProcessOptions,
+  ): Promise<Omit<InboxItemProcessSuccess, 'ok'>>;
+  runReprocess(
+    inboxItemId: string,
+    options?: InboxItemProcessOptions,
+  ): Promise<Omit<InboxItemProcessSuccess, 'ok'>>;
 }
 
 export class InboxItemProcessService {
@@ -43,7 +53,7 @@ export class InboxItemProcessService {
     private readonly pipeline: InboxItemProcessPipeline | null = null,
   ) {}
 
-  async processById(id: string): Promise<InboxItemProcessSuccess> {
+  async processById(id: string, options?: InboxItemProcessOptions): Promise<InboxItemProcessSuccess> {
     if (!isValidUuid(id)) {
       throw new InboxItemProcessError('INVALID_UUID', 'Invalid inbox item id');
     }
@@ -79,7 +89,7 @@ export class InboxItemProcessService {
     }
 
     try {
-      const result = await this.pipeline.run(inboxItem);
+      const result = await this.pipeline.run(inboxItem, options);
       return { ok: true, ...result };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

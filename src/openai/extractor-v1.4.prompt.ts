@@ -56,8 +56,12 @@ export function buildExtractorV14UserMessage(params: {
   timezone: string;
   source_channel: string;
   source_mode: string;
+  context_block?: string;
 }): string {
-  return `<received_at>${params.received_at}</received_at>
+  const contextXml = params.context_block?.trim()
+    ? `<retrieval_context>${params.context_block.trim()}</retrieval_context>\n`
+    : '';
+  return `${contextXml}<received_at>${params.received_at}</received_at>
 <timezone>${params.timezone}</timezone>
 <source_channel>${params.source_channel}</source_channel>
 <source_mode>${params.source_mode}</source_mode>

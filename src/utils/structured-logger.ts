@@ -35,6 +35,7 @@ export type LogStage =
   | 'intent_classify'
   | 'route_dispatch'
   | 'retrieval'
+  | 'retrieval_for_extraction'
   | 'rerank'
   | 'extraction'
   | 'persist'

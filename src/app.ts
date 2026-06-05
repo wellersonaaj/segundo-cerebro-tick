@@ -37,7 +37,7 @@ import { ExtractionPipelineV14Service } from './services/extraction-pipeline-v14
 import { createIntentClassifierService } from './services/intent-classifier.service.js';
 import { InboxItemProcessService } from './services/inbox-item-process.service.js';
 import { MemorySearchService } from './services/memory-search.service.js';
-import { createRagPipeline } from './services/rag/create-rag-pipeline.js';
+import { createRagPipeline, createRetrievalService } from './services/rag/create-rag-pipeline.js';
 import { TelegramInboxService } from './services/telegram-inbox.service.js';
 import { ThreadConversationContextService } from './services/thread-conversation-context.service.js';
 import { UnifiedRouterService } from './services/unified-router.service.js';
@@ -73,6 +73,8 @@ export async function buildApp(deps: AppDeps = {}) {
   const clarifications = new ClarificationService(clarificationsRepo, v14Pipeline);
   const assistantSession = new AssistantSessionService(inboxRepo, clarificationsRepo, tasksRepo);
   const threadContextService = new ThreadConversationContextService(db);
+  const rag = env.OPENAI_API_KEY ? createRagPipeline({ db }) : null;
+  const retrieval = env.OPENAI_API_KEY ? createRetrievalService({ db }) : null;
   const assistantTurn =
     deps.assistantTurn ??
     new AssistantTurnService(
@@ -84,9 +86,9 @@ export async function buildApp(deps: AppDeps = {}) {
       new ExtractionRunsV2Repository(db),
       corrections,
       threadContextService,
+      retrieval,
     );
 
-  const rag = env.OPENAI_API_KEY ? createRagPipeline({ db }) : null;
   const intentClassifier =
     env.OPENAI_API_KEY && env.INTENT_CLASSIFIER_ENABLED
       ? createIntentClassifierService()

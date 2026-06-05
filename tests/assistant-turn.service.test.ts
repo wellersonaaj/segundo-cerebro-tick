@@ -3,6 +3,8 @@ import { createNoOpDelivery } from '../src/services/assistant-delivery.js';
 import { AssistantTurnService } from '../src/services/assistant-turn.service.js';
 import type { CorrectionService } from '../src/services/correction.service.js';
 import type { ThreadConversationContextService } from '../src/services/thread-conversation-context.service.js';
+import type { RetrievalService } from '../src/services/retrieval.service.js';
+import { formatRetrievalAsContextBlock } from '../src/services/pre-context.service.js';
 
 function baseInput(overrides: Record<string, unknown> = {}) {
   return {
@@ -156,5 +158,67 @@ describe('AssistantTurnService correction mode', () => {
     });
 
     await vi.waitFor(() => expect(inboxRepo.create).toHaveBeenCalled());
+  });
+});
+
+describe('AssistantTurnService pre-context', () => {
+  it('passes preContextBlock to processById when retrieval returns hits', async () => {
+    const retrievalResult = {
+      inbox: [
+        {
+          id: '1',
+          content: 'marquei consulta com Breno quinta 14h',
+          source_channel: 'telegram',
+          occurred_at: '2026-06-01',
+          score: 0.9,
+        },
+      ],
+      assertions: [],
+      latencyMs: 10,
+    };
+
+    const retrieval = {
+      retrieve: vi.fn(async () => retrievalResult),
+    } as unknown as RetrievalService;
+
+    const processById = vi.fn(async () => ({
+      ok: true,
+      inbox_item_id: 'new-inbox',
+      processing_status: 'completed' as const,
+      extraction_run_id: 'run-1',
+    }));
+
+    const inboxRepo = {
+      findBySourceReference: vi.fn(async () => null),
+      create: vi.fn(async () => ({ id: 'new-inbox' })),
+      findById: vi.fn(async () => null),
+      updateMetadata: vi.fn(async () => {}),
+    };
+
+    const service = new AssistantTurnService(
+      inboxRepo as never,
+      { processById } as never,
+      { listPendingByInboxItem: vi.fn(), listAnsweredByInboxItem: vi.fn() } as never,
+      null,
+      { listByInboxItem: vi.fn(async () => []) } as never,
+      { findById: vi.fn(async () => null) } as never,
+      null,
+      null,
+      retrieval,
+    );
+
+    await service.startCapture({
+      text: 'reunião com Breno amanhã',
+      thread_id: 'telegram:chat:1',
+      channel: 'telegram',
+      received_at: new Date().toISOString(),
+      timezone: 'America/Sao_Paulo',
+      delivery: createNoOpDelivery(),
+      mode: 'capture',
+    });
+
+    await vi.waitFor(() => expect(processById).toHaveBeenCalled());
+    const expectedBlock = formatRetrievalAsContextBlock(retrievalResult);
+    expect(processById).toHaveBeenCalledWith('new-inbox', { preContextBlock: expectedBlock });
   });
 });

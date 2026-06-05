@@ -33,7 +33,9 @@ import type {
 } from './assistant-turn.types.js';
 import type { ClarificationService } from './clarification.service.js';
 import type { CorrectionService } from './correction.service.js';
-import type { InboxItemProcessService } from './inbox-item-process.service.js';
+import type { InboxItemProcessOptions, InboxItemProcessService } from './inbox-item-process.service.js';
+import type { RetrievalService } from './retrieval.service.js';
+import { formatRetrievalAsContextBlock } from './pre-context.service.js';
 import type { ThreadConversationContextService } from './thread-conversation-context.service.js';
 import { aggregateUncertaintyGaps, filterPersistableEphemeralGaps } from './uncertainty-aggregator.js';
 import { persistEphemeralUncertaintyGaps } from './assistant-ephemeral-clarifications.service.js';
@@ -47,6 +49,7 @@ export class AssistantTurnService {
     private readonly runsV2Repo: ExtractionRunsV2Repository,
     private readonly correctionService: CorrectionService | null = null,
     private readonly threadContextService: ThreadConversationContextService | null = null,
+    private readonly retrieval: RetrievalService | null = null,
   ) {}
 
   async startCapture(input: StartCaptureInput): Promise<AssistantTurnAck> {
@@ -205,8 +208,13 @@ export class AssistantTurnService {
         return;
       }
 
+      const preContextBlock = await this.buildPreContextBlock(input.text);
+
       const alsTurn = getCurrentTurn();
-      const runExtraction = () => this.v14Process!.processById(inboxItem.id);
+      const processOptions: InboxItemProcessOptions | undefined = preContextBlock
+        ? { preContextBlock }
+        : undefined;
+      const runExtraction = () => this.v14Process!.processById(inboxItem.id, processOptions);
       const pipelineResult = alsTurn
         ? await (async () => {
             let result!: Awaited<ReturnType<InboxItemProcessService['processById']>>;
@@ -377,6 +385,33 @@ export class AssistantTurnService {
         }),
       );
     }
+  }
+
+  private async buildPreContextBlock(text: string): Promise<string | undefined> {
+    if (!this.retrieval) return undefined;
+
+    const runRetrieve = async () =>
+      this.retrieval!.retrieve(text.trim(), { topKInbox: 5, topKAssertions: 3 });
+
+    const alsTurn = getCurrentTurn();
+    const result = alsTurn
+      ? await (async () => {
+          let retrieved!: Awaited<ReturnType<RetrievalService['retrieve']>>;
+          await alsTurn.handle.stage('retrieval_for_extraction', async () => {
+            retrieved = await runRetrieve();
+            return {
+              output: {
+                hits: retrieved.inbox.length + retrieved.assertions.length,
+                latency_ms: retrieved.latencyMs,
+              },
+            };
+          });
+          return retrieved;
+        })()
+      : await runRetrieve();
+
+    const block = formatRetrievalAsContextBlock(result);
+    return block || undefined;
   }
 
   private async resolveOrCreateInbox(
