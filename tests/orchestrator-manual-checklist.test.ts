@@ -180,4 +180,38 @@ describe('orchestrator manual checklist (automated)', () => {
     );
     expect(router.handle).not.toHaveBeenCalled();
   });
+
+  it('5b query with pending clarification — routes to router, does NOT resolve', async () => {
+    const inboxRepo = {
+      listTelegramByChatId: vi.fn(async () => [inboxRow()]),
+      findById: vi.fn(async () => inboxRow()),
+    } as unknown as InboxItemsRepository;
+
+    const clarificationsRepo = {
+      listPendingForTelegramChat: vi.fn(async () => [clarification()]),
+      listAnsweredByInboxItem: vi.fn(async () => []),
+      findById: vi.fn(async () => clarification()),
+    } as unknown as ClarificationsRepository;
+
+    const assistantTurn = {
+      resolveClarification: vi.fn(),
+    } as unknown as AssistantTurnService;
+
+    const router = {
+      handle: vi.fn(async () => ({
+        kind: 'sync_reply' as const,
+        text: 'Resposta RAG',
+      })),
+    } as unknown as UnifiedRouterService;
+
+    const service = new TelegramInboxService(inboxRepo, router, assistantTurn, clarificationsRepo);
+    await service.handleIncoming(
+      capture({ text: 'o que eu tenho com o Breno?', messageId: 206 }),
+    );
+
+    expect(assistantTurn.resolveClarification).not.toHaveBeenCalled();
+    expect(router.handle).toHaveBeenCalledWith(
+      expect.objectContaining({ text: 'o que eu tenho com o Breno?' }),
+    );
+  });
 });

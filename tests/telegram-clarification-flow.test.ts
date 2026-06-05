@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { formatClarificationPrompt } from '../src/telegram/format-clarification-prompt.js';
 import {
   isNewCaptureIntent,
+  looksLikeClarificationAnswer,
   parseClarificationAnswer,
   stripNewCapturePrefix,
 } from '../src/telegram/parse-clarification-answer.js';
@@ -21,6 +22,13 @@ describe('parse-clarification-answer', () => {
     expect(isNewCaptureIntent('nova: outra mensagem')).toBe(true);
     expect(stripNewCapturePrefix('nova: outra mensagem')).toBe('outra mensagem');
     expect(isNewCaptureIntent('1')).toBe(false);
+  });
+
+  it('looksLikeClarificationAnswer accepts short and keyword answers', () => {
+    expect(looksLikeClarificationAnswer('1')).toBe(true);
+    expect(looksLikeClarificationAnswer('sim')).toBe(true);
+    expect(looksLikeClarificationAnswer('é Breno Moreira')).toBe(true);
+    expect(looksLikeClarificationAnswer('O que eu tenho com o Breno?')).toBe(false);
   });
 });
 

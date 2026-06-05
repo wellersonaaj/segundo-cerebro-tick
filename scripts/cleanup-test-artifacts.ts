@@ -30,6 +30,39 @@ export const DEFAULT_TEST_CLARIFICATION_IDS = [
 ] as const;
 
 const ARCHIVE_REASON = 'orchestrator_test_session_cleanup';
+const DISMISS_REASON_SUFFIX = ' [dismissed: parent_archived]';
+
+async function dismissPendingForInbox(
+  db: ReturnType<typeof createClient>,
+  inboxId: string,
+  dryRun: boolean,
+): Promise<number> {
+  const { data: pending, error } = await db
+    .from('clarification_requests')
+    .select('id, status, reason')
+    .eq('inbox_item_id', inboxId)
+    .eq('status', 'pending');
+  if (error) throw new Error(`clarification list for inbox ${inboxId}: ${error.message}`);
+  if (!pending?.length) return 0;
+
+  for (const row of pending) {
+    console.log(`${dryRun ? '→' : '✓'} clarification ${row.id} — dismiss (parent_archived)`);
+  }
+
+  if (dryRun || !pending.length) return pending.length;
+
+  const now = new Date().toISOString();
+  for (const row of pending) {
+    const reason = `${String(row.reason ?? '')}${DISMISS_REASON_SUFFIX}`.trim();
+    const { error: updErr } = await db
+      .from('clarification_requests')
+      .update({ status: 'dismissed', reason, updated_at: now })
+      .eq('id', row.id)
+      .eq('status', 'pending');
+    if (updErr) throw new Error(`clarification dismiss ${row.id}: ${updErr.message}`);
+  }
+  return pending.length;
+}
 
 function parseIds(envKey: string, fallback: readonly string[]): string[] {
   const raw = process.env[envKey]?.trim();
@@ -60,6 +93,7 @@ async function main(): Promise<void> {
     const meta = (row.metadata ?? {}) as Record<string, unknown>;
     if (meta.archived === true && meta.archived_reason === ARCHIVE_REASON) {
       console.log(`✓ inbox ${id} — já arquivado`);
+      await dismissPendingForInbox(db, id, dryRun);
       continue;
     }
 
@@ -75,6 +109,9 @@ async function main(): Promise<void> {
       };
       const { error: updErr } = await db.from('inbox_items').update({ metadata: nextMeta }).eq('id', id);
       if (updErr) throw new Error(`inbox archive ${id}: ${updErr.message}`);
+      await dismissPendingForInbox(db, id, dryRun);
+    } else {
+      await dismissPendingForInbox(db, id, dryRun);
     }
   }
 

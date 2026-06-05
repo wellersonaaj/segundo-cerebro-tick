@@ -3,6 +3,7 @@ import { ClarificationsRepository } from '../repositories/clarifications.reposit
 import { InboxItemsRepository } from '../repositories/inbox-items.repository.js';
 import {
   isNewCaptureIntent,
+  looksLikeClarificationAnswer,
   parseClarificationAnswer,
   stripNewCapturePrefix,
 } from '../telegram/parse-clarification-answer.js';
@@ -84,13 +85,26 @@ export class TelegramInboxService {
       message_id: capture.messageId,
     });
 
-    await turn?.handle.stage('clarification_check', {
-      output: { forced_new: forceNewCapture, will_try_resolve: !forceNewCapture },
-    });
-
     if (!forceNewCapture) {
-      const resolved = await this.tryResolveClarification(capture, captureText, threadId, delivery);
-      if (resolved) return resolved;
+      const shouldResolve = await this.shouldTryResolveClarification(capture, captureText);
+      await turn?.handle.stage('clarification_check', {
+        output: shouldResolve.will_try_resolve
+          ? { forced_new: false, will_try_resolve: true }
+          : {
+              forced_new: false,
+              will_try_resolve: false,
+              reason: shouldResolve.reason ?? 'not_answer_shape',
+            },
+      });
+
+      if (shouldResolve.will_try_resolve) {
+        const resolved = await this.tryResolveClarification(capture, captureText, threadId, delivery);
+        if (resolved) return resolved;
+      }
+    } else {
+      await turn?.handle.stage('clarification_check', {
+        output: { forced_new: true, will_try_resolve: false },
+      });
     }
 
     if (!captureText.trim()) {
@@ -132,6 +146,29 @@ export class TelegramInboxService {
       turn_id: routerResult.turn_id,
       thread_id: routerResult.thread_id,
     };
+  }
+
+  private async shouldTryResolveClarification(
+    capture: ParsedTelegramCapture,
+    text: string,
+  ): Promise<{ will_try_resolve: boolean; reason?: string }> {
+    if (!this.clarificationQueue) {
+      return { will_try_resolve: false, reason: 'no_clarification_queue' };
+    }
+
+    if (capture.replyToMessageId != null) {
+      const byReply = await this.clarificationQueue.findByPromptMessageId(
+        capture.chatId,
+        capture.replyToMessageId,
+      );
+      if (byReply) return { will_try_resolve: true };
+    }
+
+    if (looksLikeClarificationAnswer(text)) {
+      return { will_try_resolve: true };
+    }
+
+    return { will_try_resolve: false, reason: 'not_answer_shape' };
   }
 
   private async tryResolveClarification(

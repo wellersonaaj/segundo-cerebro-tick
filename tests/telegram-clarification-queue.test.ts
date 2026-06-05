@@ -118,6 +118,23 @@ describe('TelegramClarificationQueueService', () => {
     expect(trace.some((t) => t.step === 'findNewestPendingForChat' && t.result === 'hit')).toBe(true);
   });
 
+  it('findPendingClarificationForChat skips archived inbox', async () => {
+    const archived = inbox('inbox-archived', 155);
+    archived.metadata = {
+      ...archived.metadata,
+      archived: true,
+    };
+    const pendingClarif = clarification({ id: 'pending-archived', inbox_item_id: 'inbox-archived' });
+    const { inboxRepo, clarificationsRepo } = mockRepos({
+      inboxes: [archived],
+      pending: [pendingClarif],
+      findById: () => pendingClarif,
+    });
+    const queue = new TelegramClarificationQueueService(inboxRepo, clarificationsRepo);
+    const ctx = await queue.findNewestPendingForChat(CHAT_ID);
+    expect(ctx).toBeNull();
+  });
+
   it('accepts string chat_id in metadata', async () => {
     const row = inbox('inbox-1', 155);
     row.metadata = {

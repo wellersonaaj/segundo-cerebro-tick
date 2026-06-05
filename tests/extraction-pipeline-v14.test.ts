@@ -165,10 +165,13 @@ describe('ExtractionPipelineV14Service', () => {
     const compileResult = baseCompileResult();
     const { pipeline, compileService } = buildPipeline(compileResult);
 
-    await pipeline.run(inboxItem);
+    await pipeline.run(inboxItem, { preContextBlock: 'MEMORIA RELEVANTE:\n[1] test' });
 
     expect(compileService.compileFromInbox).toHaveBeenCalledOnce();
-    expect(compileService.compileFromInbox).toHaveBeenCalledWith(inboxItem);
+    expect(compileService.compileFromInbox).toHaveBeenCalledWith(
+      inboxItem,
+      expect.objectContaining({ preContextBlock: expect.any(String) }),
+    );
   });
 
   it('never invokes extractor v1.3 ExtractFn', async () => {

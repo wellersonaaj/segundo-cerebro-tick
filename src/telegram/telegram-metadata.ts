@@ -9,6 +9,10 @@ export interface TelegramClarificationState {
   prompt_message_id: number;
 }
 
+export function isInboxArchived(metadata: Record<string, unknown> | null | undefined): boolean {
+  return metadata?.archived === true;
+}
+
 export function getTelegramChatId(metadata: Record<string, unknown> | null | undefined): number | null {
   const telegram = metadata?.telegram;
   if (!telegram || typeof telegram !== 'object') return null;

@@ -4,6 +4,7 @@ import type { ClarificationRequest } from '../types/domain.js';
 import {
   getTelegramChatId,
   getTelegramClarificationState,
+  isInboxArchived,
   isTelegramPromptableClarification,
 } from '../telegram/telegram-metadata.js';
 import { log } from '../utils/logger.js';
@@ -26,7 +27,7 @@ export class TelegramClarificationQueueService {
   ) {}
 
   async findOldestPendingForChat(chatId: number): Promise<PendingClarificationContext | null> {
-    const inboxes = await this.inboxRepo.listTelegramByChatId(chatId);
+    const inboxes = this.activeTelegramInboxes(await this.inboxRepo.listTelegramByChatId(chatId));
     if (!inboxes.length) return null;
 
     const inboxById = new Map(inboxes.map((i) => [i.id, i]));
@@ -43,7 +44,7 @@ export class TelegramClarificationQueueService {
   }
 
   async findNewestPendingForChat(chatId: number): Promise<PendingClarificationContext | null> {
-    const inboxes = await this.inboxRepo.listTelegramByChatId(chatId);
+    const inboxes = this.activeTelegramInboxes(await this.inboxRepo.listTelegramByChatId(chatId));
     if (!inboxes.length) return null;
 
     const inboxById = new Map(inboxes.map((i) => [i.id, i]));
@@ -64,7 +65,7 @@ export class TelegramClarificationQueueService {
     chatId: number,
     promptMessageId: number,
   ): Promise<PendingClarificationContext | null> {
-    const inboxes = await this.inboxRepo.listTelegramByChatId(chatId);
+    const inboxes = this.activeTelegramInboxes(await this.inboxRepo.listTelegramByChatId(chatId));
     for (const inbox of inboxes) {
       const state = getTelegramClarificationState(inbox.metadata ?? null);
       if (state?.prompt_message_id !== promptMessageId) continue;
@@ -84,6 +85,7 @@ export class TelegramClarificationQueueService {
     if (!clarification || clarification.status !== 'pending') return null;
     const inbox = await this.inboxRepo.findById(clarification.inbox_item_id);
     if (!inbox || inbox.source_channel !== 'telegram') return null;
+    if (isInboxArchived(inbox.metadata ?? null)) return null;
     const state = getTelegramClarificationState(inbox.metadata ?? null);
     if (state?.active_clarification_id !== clarificationId) return null;
     if (getTelegramChatId(inbox.metadata ?? null) !== chatId) return null;
@@ -91,7 +93,7 @@ export class TelegramClarificationQueueService {
   }
 
   async findActiveClarificationForChat(chatId: number): Promise<PendingClarificationContext | null> {
-    const inboxes = await this.inboxRepo.listTelegramByChatId(chatId);
+    const inboxes = this.activeTelegramInboxes(await this.inboxRepo.listTelegramByChatId(chatId));
     for (const inbox of inboxes) {
       const state = getTelegramClarificationState(inbox.metadata ?? null);
       if (!state) continue;
@@ -138,6 +140,10 @@ export class TelegramClarificationQueueService {
     return byNewestPending;
   }
 
+  private activeTelegramInboxes(inboxes: InboxItemRow[]): InboxItemRow[] {
+    return inboxes.filter((inbox) => !isInboxArchived(inbox.metadata ?? null));
+  }
+
   private async buildPendingContext(
     chatId: number,
     clarification: ClarificationRequest,
@@ -153,6 +159,7 @@ export class TelegramClarificationQueueService {
     if (!isTelegramPromptableClarification(clarification, answeredSlices)) return null;
     const inbox = inboxById.get(clarification.inbox_item_id);
     if (!inbox || getTelegramChatId(inbox.metadata ?? null) !== chatId) return null;
+    if (isInboxArchived(inbox.metadata ?? null)) return null;
     return { clarification, inbox };
   }
 }
