@@ -17,11 +17,14 @@
  * Output em /tmp/observer-eval.jsonl (1 entry por pergunta).
  *
  * Uso:
- *   set -a; source /root/.observer_env; set +a
  *   npx tsx scripts/observer-eval.ts
+ *   (carrega .env do project root automaticamente)
  */
 
 import { appendFile, writeFile } from 'node:fs/promises';
+import { loadDotEnv } from '../src/config/load-dotenv.js';
+
+loadDotEnv();
 
 const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;

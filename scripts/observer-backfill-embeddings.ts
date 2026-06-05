@@ -10,10 +10,14 @@
  * Idempotente: pula rows que já têm embedding.
  *
  * Uso:
- *   set -a; source /root/.observer_env; set +a
  *   npx tsx scripts/observer-backfill-embeddings.ts
+ *   (carrega .env do project root automaticamente)
  *   npx tsx scripts/observer-backfill-embeddings.ts --batch=50 --only=inbox_items --dry-run
  */
+
+import { loadDotEnv } from '../src/config/load-dotenv.js';
+
+loadDotEnv();
 
 const BATCH_SIZE = Number(process.argv.find(a => a.startsWith('--batch='))?.split('=')[1] ?? 50);
 const ONLY = process.argv.find(a => a.startsWith('--only='))?.split('=')[1];
