@@ -1,9 +1,12 @@
+import { randomUUID } from 'node:crypto';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { getTelegramConfig } from '../config/telegram.js';
 import { parseTelegramWebhookBody } from '../telegram/parse-update.js';
 import { sendTelegramMessageSafe } from '../services/assistant-delivery.js';
 import type { TelegramInboxService } from '../services/telegram-inbox.service.js';
 import { log } from '../utils/logger.js';
+import { logError, logWebhookReceived } from '../utils/structured-logger.js';
+import { getCurrentTurn, runWithTurn } from '../utils/turn-context.js';
 
 const TELEGRAM_SECRET_HEADER = 'x-telegram-bot-api-secret-token';
 
@@ -58,40 +61,54 @@ export async function registerTelegramWebhookRoutes(
       return reply.status(403).send({ error: 'User not allowed' });
     }
 
-    log('info', 'telegram_webhook', {
-      step: 'capture_accepted',
+    const turn_id = randomUUID();
+    await logWebhookReceived({
+      turn_id,
+      user_id: capture.userId,
       chat_id: capture.chatId,
       message_id: capture.messageId,
-      update_id: capture.updateId,
+      text_preview: capture.text,
     });
 
     reply.send({ ok: true, accepted: true });
 
-    void deps.telegramInbox
-      .handleIncoming(capture)
-      .then((handled) => {
-        log('info', 'telegram_webhook', {
-          step: 'capture_handled',
-          kind: handled.kind,
-          turn_id: handled.turn_id,
-          chat_id: capture.chatId,
-          message_id: capture.messageId,
-        });
-      })
-      .catch(async (err) => {
-        const message = err instanceof Error ? err.message : String(err);
-        log('error', 'telegram_webhook', {
-          step: 'capture_failed',
-          error: message,
-          chat_id: capture.chatId,
-          message_id: capture.messageId,
-        });
-        await sendTelegramMessageSafe(
-          config,
-          capture.chatId,
-          'Não consegui processar esta mensagem. Tente de novo em instantes.',
-          { step: 'error_reply' },
-        );
-      });
+    void runWithTurn(
+      {
+        turn_id,
+        user_id: capture.userId,
+        chat_id: capture.chatId,
+        message_id: capture.messageId,
+      },
+      async () => {
+        const turn = getCurrentTurn();
+        try {
+          const handled = await deps.telegramInbox.handleIncoming(capture);
+          log('info', 'telegram_webhook', {
+            step: 'capture_handled',
+            kind: handled.kind,
+            turn_id: handled.turn_id,
+            chat_id: capture.chatId,
+            message_id: capture.messageId,
+          });
+          await turn?.handle.finish({ output: { kind: handled.kind } });
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          await logError({ turn_id, stage: 'webhook_handler', error: err });
+          await turn?.handle.finish({ error: message });
+          log('error', 'telegram_webhook', {
+            step: 'capture_failed',
+            error: message,
+            chat_id: capture.chatId,
+            message_id: capture.messageId,
+          });
+          await sendTelegramMessageSafe(
+            config,
+            capture.chatId,
+            'Não consegui processar esta mensagem. Tente de novo em instantes.',
+            { step: 'error_reply' },
+          );
+        }
+      },
+    );
   });
 }

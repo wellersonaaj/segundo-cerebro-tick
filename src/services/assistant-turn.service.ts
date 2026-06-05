@@ -11,6 +11,7 @@ import {
   withTelegramClarificationState,
 } from '../telegram/telegram-metadata.js';
 import { log } from '../utils/logger.js';
+import { getCurrentTurn } from '../utils/turn-context.js';
 import {
   composeAssistantAck,
   composeClarificationAck,
@@ -118,7 +119,24 @@ export class AssistantTurnService {
         return;
       }
 
-      const pipelineResult = await this.v14Process!.processById(inboxItem.id);
+      const alsTurn = getCurrentTurn();
+      const runExtraction = () => this.v14Process!.processById(inboxItem.id);
+      const pipelineResult = alsTurn
+        ? await (async () => {
+            let result!: Awaited<ReturnType<InboxItemProcessService['processById']>>;
+            await alsTurn.handle.stage('extraction', async () => {
+              result = await runExtraction();
+              return {
+                output: {
+                  inbox_item_id: result.inbox_item_id,
+                  processing_status: result.processing_status,
+                  extraction_run_id: result.extraction_run_id,
+                },
+              };
+            });
+            return result;
+          })()
+        : await runExtraction();
       await this.deliverFollowUp(turnId, input, inboxItem.id, pipelineResult);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

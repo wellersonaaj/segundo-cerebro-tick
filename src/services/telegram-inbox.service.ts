@@ -12,6 +12,7 @@ import { createTelegramDelivery } from './assistant-delivery.js';
 import type { AssistantTurnService } from './assistant-turn.service.js';
 import { AssistantTurnService as AssistantTurnServiceClass } from './assistant-turn.service.js';
 import { TelegramClarificationQueueService } from './telegram-clarification-queue.service.js';
+import { getCurrentTurn } from '../utils/turn-context.js';
 
 export function buildTelegramInboxMetadata(
   capture: ParsedTelegramCapture,
@@ -54,12 +55,31 @@ export class TelegramInboxService {
 
   async handleIncoming(capture: ParsedTelegramCapture): Promise<TelegramHandleResult> {
     const config = requireTelegramConfig();
+    const turn = getCurrentTurn();
     const text = capture.text.trim();
     const forceNewCapture = isNewCaptureIntent(text);
     const captureText = forceNewCapture ? stripNewCapturePrefix(text) : text;
+
+    await turn?.handle.stage('parse', {
+      output: {
+        forced_new: forceNewCapture,
+        text_length: captureText.length,
+        has_reply: capture.replyToMessageId != null,
+      },
+    });
+
     const threadId = AssistantTurnServiceClass.threadIdForTelegramChat(capture.chatId);
+
+    await turn?.handle.stage('thread_resolve', {
+      output: { thread_id: threadId },
+    });
+
     const delivery = createTelegramDelivery(config, capture.chatId, {
       message_id: capture.messageId,
+    });
+
+    await turn?.handle.stage('clarification_check', {
+      output: { forced_new: forceNewCapture, will_try_resolve: !forceNewCapture },
     });
 
     if (!forceNewCapture) {
