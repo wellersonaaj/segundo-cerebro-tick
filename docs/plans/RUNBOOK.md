@@ -30,12 +30,12 @@ Criar src/utils/turn-context.ts:
 - const storage = new AsyncLocalStorage<TurnCtx>()
 - export function runWithTurn<T>(ctx: Omit<TurnCtx, 'handle' | 'started_at'>, fn: () => Promise<T> | T): Promise<T> | T
 - export function getCurrentTurn(): TurnCtx | null   // null quando fora de Telegram (testes, API)
-- export function requireCurrentTurn(): TurnCtx       // throw se null, pra casos onde é obrigatório
 
-Quando getCurrentTurn() retorna null, o structured-logger continua
-funcionando: cada turn.stage() cria um turn ad-hoc com turn_id
-gerado na hora (uuid ephemeral). NUNCA quebra — só perde o tracking
-de correlação.
+NOTA: NÃO exportar requireCurrentTurn(). Services SEMPRE usam
+getCurrentTurn() e checam null — se null, o stage loga sem turn_id
+(ou cria um ad-hoc com uuid ephemeral). Razão: testes existentes
+(assistant-e2e.test.ts, etc.) chamam startCapture() direto sem webhook,
+e quebrar esses testes seria regressão evitável.
 
 ### 2. Testes do structured-logger
 
@@ -55,34 +55,56 @@ Criar tests/utils/structured-logger.test.ts (vitest). Cobrir:
 
 Modificar src/utils/logger.ts pra DELEGAR ao structured-logger:
 - Manter export `log(level, message, meta)` (não quebra 9 call sites)
-- Internamente: chamar getCurrentTurn(); se existe, turn.stage(message, { meta }); senão, criar entry avulsa com stage=message
+- Internamente:
+  const turn = getCurrentTurn();
+  if (turn) {
+    turn.handle.stage(message, { meta: { level, ...meta } });
+  } else {
+    // cria entry avulsa (turn_id ephemeral)
+    const adHoc = startTurn({ turn_id: randomUUID(), input: message });
+    adHoc.stage(message, { meta: { level, ...meta } });
+    await adHoc.finish();
+  }
+- API correta é `turn.stage(stage, { meta: {...} })` — `meta` é uma chave
+  dentro de StageOptions, não spread
 - Resultado: stdout continua igual, mas agora tudo vai pro arquivo JSONL também
 - O call site NÃO precisa mudar agora — migração dos 9 call sites vem depois (Fase 6+)
 
 ### 4. Plugar turn_id no pipeline Telegram (3 arquivos)
 
-Modificar src/api/telegram-webhook.routes.ts:
-- Envolver o handleIncoming inteiro em runWithTurn:
-  await runWithTurn({ turn_id: randomUUID(), user_id: capture.userId, chat_id: capture.chatId, message_id: capture.messageId }, async () => {
-    reply.send({ ok: true, accepted: true });
+Modificar src/api/telegram-webhook.routes.ts — PADRÃO: reply.send ANTES do void runWithTurn:
+  // 1. log inicial (síncrono, sem ALS)
+  await logWebhookReceived({ turn_id: randomUUID(), ... });
+  reply.send({ ok: true, accepted: true });
+
+  // 2. processa em background, com ALS
+  void runWithTurn({ turn_id, user_id: capture.userId, chat_id: capture.chatId, message_id: capture.messageId }, async () => {
+    const turn = getCurrentTurn();
     try {
       const handled = await deps.telegramInbox.handleIncoming(capture);
-      await getCurrentTurn()?.finish();
+      await turn?.handle.finish();
     } catch (err) {
-      await logError({ turn_id: getCurrentTurn()?.turn_id, stage: 'webhook_handler', error: err });
-      await getCurrentTurn()?.finish({ error: err.message });
+      await logError({ turn_id, stage: 'webhook_handler', error: err });
+      await turn?.handle.finish({ error: err instanceof Error ? err.message : String(err) });
     }
   });
-- IMPORTANTE: runWithTurn precisa envolver o .then/.catch do webhook, não só o handleIncoming. Toda a cadeia async carrega o mesmo turn_id.
+- CRÍTICO: reply.send acontece ANTES do void runWithTurn. Telegram não
+  espera o pipeline inteiro (evita timeout/retry).
+- CRÍTICO: logWebhookReceived() é chamado uma vez por entrada (síncrono,
+  garante que sempre aparece no JSONL mesmo se o pipeline async falhar).
+- runWithTurn envolve TODA a cadeia async (handleIncoming + .then/.catch
+  + finish). Toda a cadeia carrega o mesmo turn_id via ALS.
 
 Modificar src/services/telegram-inbox.service.ts:
-- Em handleIncoming, no início: const turn = requireCurrentTurn() (injetado via ALS)
-- Adicionar stages: turn.stage('parse', ...), turn.stage('thread_resolve', ...), turn.stage('clarification_check', ...)
-- O tryResolveClarification agora roda dentro do contexto do turn
+- Em handleIncoming, no início: const turn = getCurrentTurn() (NÃO throw se null)
+- Adicionar stages: turn?.handle.stage('parse', ...), turn?.handle.stage('thread_resolve', ...), turn?.handle.stage('clarification_check', ...)
+- Se turn === null (teste), skipa os stages — não quebra nada
+- O tryResolveClarification agora roda dentro do contexto do turn (ou sem, em teste)
 
 Modificar src/services/assistant-turn.service.ts:
-- Em startCapture, no início: const turn = requireCurrentTurn()
-- Envolver chamada do v14 pipeline em turn.stage('extraction', async () => { ... })
+- Em startCapture, no início: const turn = getCurrentTurn()
+- Se turn existe, envolver chamada do v14 pipeline em turn.handle.stage('extraction', async () => { ... })
+- Se turn === null (teste), chama v14 direto — comportamento atual preservado
 
 NÃO mexer em:
 - Lógica de negócio (só adicionar logs, sem mudar comportamento)
@@ -93,10 +115,11 @@ NÃO mexer em:
 
 Aceite:
 - npm test -- structured-logger passa 100% (novo)
-- npm test geral passa 100% (nada quebra)
+- npm test geral passa 100% (nada quebra, incluindo assistant-e2e.test.ts)
 - Manda 1 mensagem no Telegram
-- tail -1 /tmp/cerebro-logs/$(date -u +%Y-%m-%d).jsonl | jq mostra TODAS as entries daquela mensagem com o MESMO turn_id (grep por message_id confirma)
-- /tmp/cerebro-logs/ contém 1 entry por message_id, com ~5 stages cada (webhook_received, parse, thread_resolve, clarification_check, extraction, turn_finish)
+- tail do JSONL filtrado por message_id mostra TODAS as entries com o MESMO turn_id
+- Stages esperados: webhook_received, parse, thread_resolve, clarification_check, extraction, turn_finish (~6 entries por msg)
+- Webhook retorna <100ms (reply.send antes do pipeline async)
 
 Rollback:
 - git revert <commit-fase-0>
@@ -226,6 +249,11 @@ Test fixtures:
    - Skip se OPENAI_API_KEY não tiver
    - Meta: ≥85% hit rate
 
+5. CRIAR O SCRIPT no package.json (não existe ainda):
+   Em package.json, adicionar:
+   "test:intent:eval": "tsx tests/intent-classifier.eval.test.ts"
+   (criar nesta fase, junto com o script — não referenciar antes de existir)
+
 Aceite:
 - npm test -- intent-classifier passa 100% (unit)
 - npm run test:intent:eval ≥85% (eval real)
@@ -272,9 +300,10 @@ Inclui o wiring do intent 'update' pra modo de correção.
      )
    - async handle(capture: ParsedTelegramCapture): Promise<string>
    - Fluxo:
-     a. const ctx = requireCurrentTurn()   // ALS da Fase 0
-     b. await ctx.handle.stage('intent_classify', async () => ({ output: result, model, input_tokens, output_tokens }))
-     c. await ctx.handle.stage('route_dispatch', { output: { intent: result.intent } })
+     a. const ctx = getCurrentTurn()   // ALS da Fase 0 — pode ser null
+     b. if (ctx) await ctx.handle.stage('intent_classify', async () => ({ output: result, model, input_tokens, output_tokens }))
+        else log estruturado avulso (turn_id ephemeral)
+     c. if (ctx) await ctx.handle.stage('route_dispatch', { output: { intent: result.intent } })
      d. switch(result.intent) {
           case 'save':    return this.assistantTurn.startCapture({ ..., mode: 'capture' })
           case 'update':  return this.assistantTurn.startCapture({ ..., mode: 'correction' })
@@ -289,15 +318,21 @@ Inclui o wiring do intent 'update' pra modo de correção.
    - Adicionar campo `mode?: 'capture' | 'correction'` em StartCaptureInput
    - Em startCapture, ANTES de criar inbox:
      - Se mode === 'correction':
-       a. Buscar último inbox_item do thread_id via ThreadConversationContextService
-          (que já tem .recentMessages e tá em src/services/)
-       b. Se NÃO achar: fallback pra 'capture' com flag, ou retornar string
-          "Corrigir o quê? O thread não tem captura recente." (decide qual no teste)
+       a. Buscar último inbox_item do thread_id:
+          - TENTAR primeiro ThreadConversationContextService.buildForThread(threadId)
+            (pode precisar ADICIONAR esse método — o existente buildForInbox(inboxItem)
+            não atende, pois precisamos do inbox, não temos o item)
+          - FALLBACK: inboxRepo.listRecent({ thread_id, limit: 1 }) filtrado
+            por thread_id (criar método se não existir)
+       b. Se NÃO achar alvo: retornar erro EXPLÍCITO ao user:
+          "Corrigir o quê? O thread não tem captura recente."
+          (NÃO fallback pra capture — menos surpresa pro user, e fica
+          explícito que a correção falhou)
        c. Se achar: chamar this.correctionService.applyCorrection(inboxItem.id, input.text)
           (NÃO criar inbox novo)
      - Se mode === 'capture' (ou sem mode): fluxo atual (cria ou reusa inbox)
    - Adicionar CorrectionService como dependência opcional no construtor
-   - Logar stage 'correction_apply' com input={inbox_id, correction_text}, output={applied: bool}
+   - Logar stage 'correction_apply' com input={inbox_id, correction_text}, output={applied: bool, correction_id}
    - IMPORTANTE: não confundir com o fluxo de clarificação Telegram
      (tryResolveClarification, que é separado). 'update' = correção de
      inbox item existente; 'clarification' = resposta a uma pergunta
@@ -305,10 +340,15 @@ Inclui o wiring do intent 'update' pra modo de correção.
 
 4. src/services/telegram-inbox.service.ts
    - Trocar a chamada `assistantTurn.startCapture(...)` por `unifiedRouter.handle(capture)`
+   - O retorno do router (string) É a resposta pro Telegram. handleIncoming
+     DEVE enviar via delivery.sendFollowUp(responseText) — mesmo padrão
+     que startCapture usa internamente hoje. Senão a Fase 3 compila mas
+     não responde no Telegram.
    - Manter lógica de "nova:" prefix e o tryResolveClarification intactos
      (clarification vem ANTES do router — é uma resposta, não um intent novo)
    - Os stages de parse/thread_resolve/clarification_check adicionados na
      Fase 0 continuam aqui
+   - Adicionar stage 'send' no final, com output={message_length, latency_send_ms}
 
 5. src/app.ts
    - Construir RetrievalService, RerankService, RAGPipelineService, IntentClassifierService, CommandHandlerService, UnifiedRouterService
@@ -466,38 +506,51 @@ npm test -- command-handler
 
 ---
 
-## Fase 6 — Rollout
+## Fase 6 — Rollout (conservador)
 
 ### Prompt pro Cursor:
 
 ```
 Tarefa: ligar de verdade, monitorar, ajustar.
 
+IMPORTANTE: INTENT_CLASSIFIER_ENABLED é OPT-OUT (default true se ausente).
+Rollout conservador: mesmo com Fases 0-5 estáveis, .env de prod começa
+com INTENT_CLASSIFIER_ENABLED=false. Só liga pra true DEPOIS de validar
+que legacy ainda funciona como antes.
+
 Sequência de comandos (executar manualmente):
 
 1. Na VM:
    cd /root/segundo-cerebro-tick
    git tag pre-orchestrator
-   # Liga o classifier
-   echo "INTENT_CLASSIFIER_ENABLED=true" >> .env
+   # Confirma que .env tem INTENT_CLASSIFIER_ENABLED=false (legacy safe)
+   grep INTENT_CLASSIFIER_ENABLED .env || echo "INTENT_CLASSIFIER_ENABLED=false" >> .env
    npm run build
-   # Restart da API (depende do setup — pm2, systemd, ou nohup)
+   # Restart da API
    pm2 restart cerebro  # ou o comando equivalente
 
-2. Manda 10 mensagens variadas no Telegram, depois:
-   jq -s 'group_by(.intent) | map({intent: .[0].intent, count: length})' /tmp/cerebro-logs/$(date -u +%Y-%m-%d).jsonl
-   # Confere distribuição razoável (não tudo save)
+2. Valida legacy: manda 10 mensagens com classifier DESLIGADO,
+   confirma que tudo continua funcionando como antes
+   (intent_classify stage não aparece no JSONL, comportamento = save sempre)
 
-3. Desliga o observer polling:
+3. Liga o classifier:
+   sed -i 's/INTENT_CLASSIFIER_ENABLED=false/INTENT_CLASSIFIER_ENABLED=true/' .env
+   pm2 restart cerebro
+
+4. Manda 10 mensagens variadas no Telegram, depois:
+   jq -s 'map(select(.stage=="intent_classify") | .output.intent) | group_by(.) | map({intent: .[0], count: length})' /tmp/cerebro-logs/$(date -u +%Y-%m-%d).jsonl
+   # Confere distribuição razoável (não 100% save)
+
+5. Desliga o observer polling:
    pkill -f observer-telegram-bot.ts
    # ou se tiver systemd: systemctl stop observer-bot
 
-4. Monitora por 1 semana:
+6. Monitora por 1 semana:
    - Custo diário: jq -s 'map(.cost_usd // 0) | add' /tmp/cerebro-logs/YYYY-MM-DD.jsonl
    - Erros: jq 'select(.level=="error")' /tmp/cerebro-logs/YYYY-MM-DD.jsonl | head
    - Latência p95: jq -s 'group_by(.stage) | map({stage: .[0].stage, p95: (map(.latency_ms) | sort | .[length * 0.95 | floor])})' /tmp/cerebro-logs/YYYY-MM-DD.jsonl
 
-5. Se tudo OK depois de 7 dias:
+7. Se tudo OK depois de 7 dias:
    git tag post-orchestrator
    # Deletar ou marcar DEPRECATED o scripts/observer-telegram-bot.ts
    rm scripts/observer-telegram-bot.ts   # ou comentar tudo com DEPRECATED

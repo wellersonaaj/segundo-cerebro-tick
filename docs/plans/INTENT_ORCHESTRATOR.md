@@ -115,8 +115,8 @@ Telegram → /webhooks/telegram (Fastify)
 | `src/services/assistant-turn.service.ts` | Aceita `retrievalContext` opcional e injeta no prompt do extractor (Caminho A) |
 | `src/api/telegram-webhook.routes.ts` | Loga webhook_received estruturado, passa turn_id pelo handle |
 | `src/app.ts` | Wire do `UnifiedRouter` na DI |
-| `src/config/env.ts` | Novas vars: `INTENT_CLASSIFIER_ENABLED`, `INTENT_CLASSIFIER_MODEL`, `RAG_RETRIEVAL_TOP_K`, `LOG_DIR` |
-| `.env.example` | Adicionar as mesmas vars |
+| `src/config/env.ts` | **JÁ FEITO** (commit `172deb2`): `INTENT_CLASSIFIER_ENABLED`, `INTENT_CLASSIFIER_MODEL`, `RAG_RETRIEVAL_TOP_K`, `RAG_RERANK_KEEP_*`, `LOG_DIR` |
+| `.env.example` | **JÁ FEITO** (commit `172deb2`): mesmas vars documentadas |
 | `scripts/observer-telegram-bot.ts` | Marcar como DEPRECATED, redirecionar pra `RAGPipelineService` |
 
 ---
