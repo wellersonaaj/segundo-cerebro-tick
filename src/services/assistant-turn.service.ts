@@ -19,6 +19,7 @@ import {
 } from './assistant-response-composer.js';
 import {
   buildAssistantThreadId,
+  resolveThreadIdFromInbox,
   withAssistantTurnMetadata,
 } from './assistant-session.service.js';
 import {
@@ -31,7 +32,9 @@ import type {
   StartCaptureInput,
 } from './assistant-turn.types.js';
 import type { ClarificationService } from './clarification.service.js';
+import type { CorrectionService } from './correction.service.js';
 import type { InboxItemProcessService } from './inbox-item-process.service.js';
+import type { ThreadConversationContextService } from './thread-conversation-context.service.js';
 import { aggregateUncertaintyGaps, filterPersistableEphemeralGaps } from './uncertainty-aggregator.js';
 import { persistEphemeralUncertaintyGaps } from './assistant-ephemeral-clarifications.service.js';
 export class AssistantTurnService {
@@ -42,9 +45,14 @@ export class AssistantTurnService {
     private readonly clarificationService: ClarificationService | null,
     private readonly taskAuditRepo: TaskAuditRepository,
     private readonly runsV2Repo: ExtractionRunsV2Repository,
+    private readonly correctionService: CorrectionService | null = null,
+    private readonly threadContextService: ThreadConversationContextService | null = null,
   ) {}
 
   async startCapture(input: StartCaptureInput): Promise<AssistantTurnAck> {
+    if (input.mode === 'correction') {
+      return this.startCorrection(input);
+    }
     if (!this.v14Process) {
       throw new Error('PIPELINE_NOT_WIRED');
     }
@@ -66,6 +74,33 @@ export class AssistantTurnService {
     void this.runCapturePipeline(turnId, input).catch((err) => {
       const message = err instanceof Error ? err.message : String(err);
       log('error', 'assistant_turn', { step: 'background_failed', turn_id: turnId, error: message });
+    });
+
+    return { turn_id: turnId, thread_id: input.thread_id, ack_message: ackMessage };
+  }
+
+  private async startCorrection(input: StartCaptureInput): Promise<AssistantTurnAck> {
+    if (!this.correctionService) {
+      throw new Error('CORRECTION_SERVICE_REQUIRED');
+    }
+
+    const turnId = randomUUID();
+    const ackMessage = composeAssistantAck();
+
+    createAssistantTurn({
+      turn_id: turnId,
+      thread_id: input.thread_id,
+      channel: input.channel,
+      status: 'processing',
+      ack_message: ackMessage,
+      created_at: new Date().toISOString(),
+    });
+
+    await input.delivery.sendAck(ackMessage);
+
+    void this.runCorrectionPipeline(turnId, input).catch((err) => {
+      const message = err instanceof Error ? err.message : String(err);
+      log('error', 'assistant_turn', { step: 'correction_background_failed', turn_id: turnId, error: message });
     });
 
     return { turn_id: turnId, thread_id: input.thread_id, ack_message: ackMessage };
@@ -100,6 +135,57 @@ export class AssistantTurnService {
     });
 
     return { turn_id: turnId, thread_id: input.thread_id, ack_message: ackMessage };
+  }
+
+  private async runCorrectionPipeline(turnId: string, input: StartCaptureInput): Promise<void> {
+    try {
+      const targetInboxId = await this.resolveCorrectionTarget(input.thread_id);
+      if (!targetInboxId) {
+        const message = 'Corrigir o quê? O thread não tem captura recente.';
+        setAssistantTurnStatus(turnId, 'failed', { error: message });
+        await input.delivery.sendFollowUp(message);
+        return;
+      }
+
+      const alsTurn = getCurrentTurn();
+      const applyCorrection = () =>
+        this.correctionService!.applyCorrection(targetInboxId, input.text);
+
+      const pipelineResult = alsTurn
+        ? await (async () => {
+            let result!: Awaited<ReturnType<CorrectionService['applyCorrection']>>;
+            await alsTurn.handle.stage('correction_apply', async () => {
+              result = await applyCorrection();
+              return {
+                input: { inbox_id: targetInboxId, correction_text: input.text },
+                output: {
+                  applied: true,
+                  correction_id: result.correction_id,
+                  processing_status: result.processing_status,
+                },
+              };
+            });
+            return result;
+          })()
+        : await applyCorrection();
+
+      await this.deliverFollowUp(turnId, input, targetInboxId, pipelineResult);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setAssistantTurnStatus(turnId, 'failed', { error: message });
+      await input.delivery.sendFollowUp(`Não consegui aplicar a correção: ${message}`);
+    }
+  }
+
+  private async resolveCorrectionTarget(threadId: string): Promise<string | null> {
+    if (this.threadContextService) {
+      const inbox = await this.threadContextService.findLatestInboxInThread(threadId);
+      if (inbox) return inbox.id;
+    }
+
+    const recent = await this.inboxRepo.listRecent({ limit: 100 });
+    const match = recent.find((row) => resolveThreadIdFromInbox(row) === threadId);
+    return match?.id ?? null;
   }
 
   private async runCapturePipeline(turnId: string, input: StartCaptureInput): Promise<void> {

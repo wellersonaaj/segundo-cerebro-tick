@@ -243,13 +243,28 @@ describe('Telegram webhook assistant flow', () => {
       deps.runsV2Repo as never,
     );
 
+    const { UnifiedRouterService } = await import('../src/services/unified-router.service.js');
+    const { CommandHandlerService } = await import('../src/services/command-handler.service.js');
+    const unifiedRouter = new UnifiedRouterService(
+      null,
+      assistantTurn,
+      null,
+      new CommandHandlerService(),
+      false,
+    );
+
     const { TelegramInboxService } = await import('../src/services/telegram-inbox.service.js');
     const { registerTelegramWebhookRoutes } = await import('../src/api/telegram-webhook.routes.js');
     const Fastify = (await import('fastify')).default;
 
     const app = Fastify({ logger: false });
     await registerTelegramWebhookRoutes(app, {
-      telegramInbox: new TelegramInboxService(deps.inboxRepo as never, assistantTurn, null),
+      telegramInbox: new TelegramInboxService(
+        deps.inboxRepo as never,
+        unifiedRouter,
+        assistantTurn,
+        null,
+      ),
     });
 
     const res = await app.inject({

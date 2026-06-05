@@ -138,6 +138,17 @@ export class ThreadConversationContextService {
     this.runsRepo = new ExtractionRunsV2Repository(db);
   }
 
+  async findLatestInboxInThread(threadId: string): Promise<InboxItemRow | null> {
+    const recent = await this.inboxRepo.listRecent({ limit: 100 });
+    return recent.find((row) => resolveThreadIdFromInbox(row) === threadId) ?? null;
+  }
+
+  async buildForThread(threadId: string): Promise<ThreadConversationContext | null> {
+    const latest = await this.findLatestInboxInThread(threadId);
+    if (!latest) return null;
+    return this.buildForInbox(latest);
+  }
+
   async buildForInbox(inboxItem: InboxItem | InboxItemRow): Promise<ThreadConversationContext | null> {
     const threadId = resolveThreadIdFromInbox(inboxItem);
     if (!threadId) return null;

@@ -27,6 +27,8 @@ export interface AssistantDelivery {
   sendFollowUp(message: string): Promise<number | null>;
 }
 
+export type CaptureMode = 'capture' | 'correction';
+
 export interface StartCaptureInput {
   text: string;
   thread_id: string;
@@ -36,6 +38,7 @@ export interface StartCaptureInput {
   source_reference?: string | null;
   metadata?: Record<string, unknown>;
   delivery: AssistantDelivery;
+  mode?: CaptureMode;
 }
 
 export interface ResolveClarificationInput {

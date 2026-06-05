@@ -9,6 +9,7 @@ import {
 import type { ParsedTelegramCapture } from '../telegram/parse-update.js';
 import { buildTelegramSourceReference } from '../telegram/telegram-source-reference.js';
 import { createTelegramDelivery } from './assistant-delivery.js';
+import type { UnifiedRouterService } from './unified-router.service.js';
 import type { AssistantTurnService } from './assistant-turn.service.js';
 import { AssistantTurnService as AssistantTurnServiceClass } from './assistant-turn.service.js';
 import { TelegramClarificationQueueService } from './telegram-clarification-queue.service.js';
@@ -45,6 +46,7 @@ export class TelegramInboxService {
 
   constructor(
     private readonly inboxRepo: InboxItemsRepository,
+    private readonly unifiedRouter: UnifiedRouterService,
     private readonly assistantTurn: AssistantTurnService,
     clarificationsRepo: ClarificationsRepository | null = null,
   ) {
@@ -91,21 +93,41 @@ export class TelegramInboxService {
       throw new Error('Empty message after stripping nova: prefix');
     }
 
-    const ack = await this.assistantTurn.startCapture({
+    const routerResult = await this.unifiedRouter.handle({
+      capture,
       text: captureText,
-      thread_id: threadId,
-      channel: 'telegram',
-      received_at: capture.receivedAt,
+      threadId,
+      delivery,
+      receivedAt: capture.receivedAt,
       timezone: config.defaultTimezone,
-      source_reference: buildTelegramSourceReference(capture.chatId, capture.messageId),
+      sourceReference: buildTelegramSourceReference(capture.chatId, capture.messageId),
       metadata: buildTelegramInboxMetadata(
         { ...capture, text: captureText },
         config.senderEntityReference,
       ),
-      delivery,
     });
 
-    return { kind: 'async_started', turn_id: ack.turn_id, thread_id: ack.thread_id };
+    if (routerResult.kind === 'sync_reply') {
+      const sendStart = Date.now();
+      await delivery.sendFollowUp(routerResult.text);
+      await turn?.handle.stage('send', {
+        output: {
+          message_length: routerResult.text.length,
+          latency_send_ms: Date.now() - sendStart,
+        },
+      });
+      return {
+        kind: 'async_started',
+        turn_id: turn?.turn_id ?? 'sync',
+        thread_id: threadId,
+      };
+    }
+
+    return {
+      kind: 'async_started',
+      turn_id: routerResult.turn_id,
+      thread_id: routerResult.thread_id,
+    };
   }
 
   private async tryResolveClarification(
