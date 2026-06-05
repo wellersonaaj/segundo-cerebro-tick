@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import { z } from 'zod';
 import { loadEnv } from '../config/env.js';
+import { log } from '../utils/logger.js';
 import {
   buildIntentClassifierUserMessage,
   INTENT_CLASSIFIER_SYSTEM_PROMPT,
@@ -20,13 +21,18 @@ export interface IntentClassifierContext {
   user_id?: string;
 }
 
+export interface IntentClassifierLlmResult {
+  content: string;
+  finish_reason?: string;
+}
+
 export interface IntentClassifierLlmClient {
   completeJson(input: {
     model: string;
     system: string;
     user: string;
     maxTokens: number;
-  }): Promise<string>;
+  }): Promise<IntentClassifierLlmResult>;
 }
 
 const intentSchema = z.enum(['save', 'update', 'query', 'command']);
@@ -44,6 +50,8 @@ const SAFE_FALLBACK: IntentResult = {
   reasoning: 'fallback seguro',
 };
 
+const DEFAULT_CLASSIFIER_MAX_TOKENS = 500;
+
 export class OpenAiIntentClassifierClient implements IntentClassifierLlmClient {
   constructor(private readonly client: OpenAI) {}
 
@@ -52,7 +60,7 @@ export class OpenAiIntentClassifierClient implements IntentClassifierLlmClient {
     system: string;
     user: string;
     maxTokens: number;
-  }): Promise<string> {
+  }): Promise<IntentClassifierLlmResult> {
     const response = await this.client.chat.completions.create({
       model: input.model,
       messages: [
@@ -61,8 +69,13 @@ export class OpenAiIntentClassifierClient implements IntentClassifierLlmClient {
       ],
       response_format: { type: 'json_object' },
       max_completion_tokens: input.maxTokens,
+      reasoning_effort: 'low',
     });
-    return response.choices[0]?.message?.content ?? '';
+    const choice = response.choices[0];
+    return {
+      content: choice?.message?.content ?? '',
+      finish_reason: choice?.finish_reason ?? undefined,
+    };
   }
 }
 
@@ -96,7 +109,7 @@ export class IntentClassifierService {
   constructor(
     private readonly llm: IntentClassifierLlmClient,
     private readonly model = 'gpt-5-mini',
-    private readonly maxTokens = 200,
+    private readonly maxTokens = DEFAULT_CLASSIFIER_MAX_TOKENS,
   ) {}
 
   async classify(text: string, context?: IntentClassifierContext): Promise<IntentResult> {
@@ -116,9 +129,9 @@ export class IntentClassifierService {
     }
 
     const userMessage = buildIntentClassifierUserMessage(trimmed, context);
-    let raw: string;
+    let llmResult: IntentClassifierLlmResult;
     try {
-      raw = await this.llm.completeJson({
+      llmResult = await this.llm.completeJson({
         model: this.model,
         system: INTENT_CLASSIFIER_SYSTEM_PROMPT,
         user: userMessage,
@@ -129,7 +142,15 @@ export class IntentClassifierService {
       return applyIntentFallback(null, `llm error: ${message}`);
     }
 
-    const parsed = parseIntentLlmResponse(raw);
+    const parsed = parseIntentLlmResponse(llmResult.content);
+    if (!parsed) {
+      log('warn', 'intent_classifier', {
+        step: 'parse_failed',
+        finish_reason: llmResult.finish_reason ?? 'n/a',
+        raw_length: llmResult.content.length,
+        raw_preview: llmResult.content.slice(0, 300),
+      });
+    }
     return applyIntentFallback(parsed, 'resposta malformada do classificador');
   }
 }

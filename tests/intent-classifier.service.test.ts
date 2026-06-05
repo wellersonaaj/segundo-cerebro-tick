@@ -5,9 +5,9 @@ import {
   type IntentClassifierLlmClient,
 } from '../src/services/intent-classifier.service.js';
 
-function mockClient(response: string): IntentClassifierLlmClient {
+function mockClient(response: string, finish_reason = 'stop'): IntentClassifierLlmClient {
   return {
-    completeJson: vi.fn(async () => response),
+    completeJson: vi.fn(async () => ({ content: response, finish_reason })),
   };
 }
 
@@ -109,5 +109,23 @@ describe('IntentClassifierService', () => {
     const result = await service.classify('algo');
     expect(result.intent).toBe('save');
     expect(result.reasoning).toContain('llm error');
+  });
+
+  it('uses reasoning_effort low and 500 max tokens by default', async () => {
+    const llm: IntentClassifierLlmClient = {
+      completeJson: vi.fn(async () => ({
+        content: JSON.stringify({
+          intent: 'query',
+          confidence: 0.9,
+          reasoning: 'pergunta',
+        }),
+        finish_reason: 'stop',
+      })),
+    };
+    const service = new IntentClassifierService(llm);
+    await service.classify('o que eu tenho com Breno?');
+    expect(llm.completeJson).toHaveBeenCalledWith(
+      expect.objectContaining({ maxTokens: 500 }),
+    );
   });
 });
