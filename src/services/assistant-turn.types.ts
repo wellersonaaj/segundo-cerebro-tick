@@ -1,3 +1,5 @@
+import type { TelegramSendOptions } from '../telegram/telegram-bot.client.js';
+
 export type AssistantChannel = 'telegram' | 'api';
 
 export type AssistantTurnStatus = 'processing' | 'completed' | 'failed';
@@ -22,9 +24,14 @@ export interface AssistantTurnAck {
   ack_message: string;
 }
 
+export interface TelegramFollowUpOptions {
+  parse_mode?: 'Markdown';
+  reply_markup?: TelegramSendOptions['reply_markup'];
+}
+
 export interface AssistantDelivery {
   sendAck(message: string): Promise<void>;
-  sendFollowUp(message: string): Promise<number | null>;
+  sendFollowUp(message: string, options?: TelegramFollowUpOptions): Promise<number | null>;
 }
 
 export type CaptureMode = 'capture' | 'correction';

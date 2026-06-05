@@ -24,10 +24,18 @@ const telegramMessageSchema = z.object({
     .optional(),
 });
 
+const telegramCallbackQuerySchema = z.object({
+  id: z.string(),
+  from: telegramUserSchema,
+  message: telegramMessageSchema.optional(),
+  data: z.string().optional(),
+});
+
 const telegramUpdateSchema = z.object({
   update_id: z.number().int().optional(),
   message: telegramMessageSchema.optional(),
   edited_message: telegramMessageSchema.optional(),
+  callback_query: telegramCallbackQuerySchema.optional(),
 });
 
 /** Optional simplified payload (tests/tools); requires message_id. */
@@ -50,8 +58,17 @@ export interface ParsedTelegramCapture {
   updateId?: number;
 }
 
+export interface ParsedTelegramCallback {
+  userId: number;
+  chatId: number;
+  messageId: number;
+  callbackQueryId: string;
+  data: string;
+}
+
 export type ParseTelegramUpdateResult =
   | { kind: 'capture'; capture: ParsedTelegramCapture }
+  | { kind: 'callback'; callback: ParsedTelegramCallback }
   | { kind: 'ignored'; reason: string }
   | { kind: 'invalid'; error: string };
 
@@ -85,12 +102,38 @@ function fromMessage(
   };
 }
 
+function fromCallbackQuery(
+  query: z.infer<typeof telegramCallbackQuerySchema>,
+): ParseTelegramUpdateResult {
+  const data = query.data?.trim();
+  if (!data) {
+    return { kind: 'ignored', reason: 'callback_without_data' };
+  }
+  const message = query.message;
+  if (!message) {
+    return { kind: 'ignored', reason: 'callback_without_message' };
+  }
+  return {
+    kind: 'callback',
+    callback: {
+      userId: query.from.id,
+      chatId: message.chat.id,
+      messageId: message.message_id,
+      callbackQueryId: query.id,
+      data,
+    },
+  };
+}
+
 export function parseTelegramWebhookBody(body: unknown): ParseTelegramUpdateResult {
   if (body != null && typeof body === 'object' && !Array.isArray(body)) {
     const record = body as Record<string, unknown>;
-    if ('message' in record || 'edited_message' in record) {
+    if ('message' in record || 'edited_message' in record || 'callback_query' in record) {
       const update = telegramUpdateSchema.safeParse(body);
       if (update.success) {
+        if (update.data.callback_query) {
+          return fromCallbackQuery(update.data.callback_query);
+        }
         const message = update.data.message ?? update.data.edited_message;
         if (!message) {
           return { kind: 'ignored', reason: 'no_message' };

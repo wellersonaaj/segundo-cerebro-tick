@@ -53,4 +53,30 @@ describe('parseTelegramWebhookBody', () => {
     });
     expect(result).toEqual({ kind: 'ignored', reason: 'message_without_text' });
   });
+
+  it('parses callback_query updates', () => {
+    const result = parseTelegramWebhookBody({
+      update_id: 10,
+      callback_query: {
+        id: 'cb-1',
+        from: { id: 5991664193 },
+        message: {
+          message_id: 99,
+          chat: { id: 5991664193 },
+          date: 1_700_000_000,
+        },
+        data: 'status:costs',
+      },
+    });
+    expect(result).toEqual({
+      kind: 'callback',
+      callback: {
+        userId: 5991664193,
+        chatId: 5991664193,
+        messageId: 99,
+        callbackQueryId: 'cb-1',
+        data: 'status:costs',
+      },
+    });
+  });
 });

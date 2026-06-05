@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import type { TelegramReplyMarkup } from '../telegram/telegram-bot.client.js';
 import type { LogEntry } from '../utils/structured-logger.js';
 
 export interface CommandHandlerContext {
@@ -11,7 +12,18 @@ export interface CommandHandlerContext {
 export interface CommandHandlerResponse {
   text: string;
   parse_mode?: 'Markdown';
+  reply_markup?: TelegramReplyMarkup;
 }
+
+export const STATUS_INLINE_KEYBOARD: TelegramReplyMarkup = {
+  inline_keyboard: [
+    [
+      { text: 'Ver custos', callback_data: 'status:costs' },
+      { text: 'Ver últimos 5 turnos', callback_data: 'status:turns' },
+      { text: 'Ver erros', callback_data: 'status:errors' },
+    ],
+  ],
+};
 
 function resolveLogDir(logDir?: string): string {
   return logDir ?? process.env.LOG_DIR ?? '/tmp/cerebro-logs';
@@ -38,19 +50,45 @@ function percentile(values: number[], p: number): number {
   return sorted[idx] ?? 0;
 }
 
+function entryCost(entry: LogEntry): number {
+  return typeof entry.cost_usd === 'number' && entry.cost_usd > 0 ? entry.cost_usd : 0;
+}
+
+function extractIntent(entry: LogEntry): string {
+  const output = entry.output;
+  if (output && typeof output === 'object' && 'intent' in output) {
+    const intent = (output as { intent?: unknown }).intent;
+    if (typeof intent === 'string') return intent;
+  }
+  return '';
+}
+
+function truncateField(value: string, max = 500): string {
+  if (value.length <= max) return value;
+  return `${value.slice(0, max - 3)}...`;
+}
+
 function sanitizeEntry(entry: LogEntry): LogEntry {
   const copy = { ...entry };
   for (const key of ['input', 'output'] as const) {
     const val = copy[key];
-    if (typeof val === 'string' && val.length > 120) {
-      copy[key] = `${val.slice(0, 117)}...`;
+    if (typeof val === 'string') {
+      copy[key] = truncateField(val, 500);
     } else if (val && typeof val === 'object') {
-      copy[key] = JSON.parse(JSON.stringify(val, (_k, v) =>
-        typeof v === 'string' && v.length > 120 ? `${v.slice(0, 117)}...` : v,
-      ));
+      copy[key] = JSON.parse(
+        JSON.stringify(val, (_k, v) =>
+          typeof v === 'string' ? truncateField(v, 500) : v,
+        ),
+      );
     }
   }
   return copy;
+}
+
+function formatLogLine(entry: LogEntry): string {
+  const intent = extractIntent(entry);
+  const latency = entry.latency_ms ?? 0;
+  return `${entry.ts} | ${entry.stage} | ${latency}ms | ${intent}`;
 }
 
 export class CommandHandlerService {
@@ -64,17 +102,37 @@ export class CommandHandlerService {
     const normalized = command.toLowerCase();
     switch (normalized) {
       case '/status':
-        return { text: await this.formatStatus(new Date()) };
+        return {
+          text: await this.formatStatus(new Date()),
+          parse_mode: 'Markdown',
+          reply_markup: STATUS_INLINE_KEYBOARD,
+        };
       case '/debug':
-        return { text: await this.formatDebug(args[0], ctx.turn_id) };
+        return {
+          text: await this.formatDebug(args[0], ctx.turn_id),
+          parse_mode: 'Markdown',
+        };
       case '/help':
-        return { text: this.formatHelp() };
+        return { text: this.formatHelp(), parse_mode: 'Markdown' };
       case '/costs':
-        return { text: await this.formatCosts() };
+        return { text: await this.formatCosts(), parse_mode: 'Markdown' };
       case '/log':
-        return { text: await this.formatLog() };
+        return { text: await this.formatLog(), parse_mode: 'Markdown' };
       default:
         return { text: `Comando desconhecido: ${command}\n\n${this.formatHelp()}` };
+    }
+  }
+
+  async handleStatusCallback(data: string): Promise<CommandHandlerResponse> {
+    switch (data) {
+      case 'status:costs':
+        return { text: await this.formatCosts(), parse_mode: 'Markdown' };
+      case 'status:turns':
+        return { text: await this.formatRecentTurns(5), parse_mode: 'Markdown' };
+      case 'status:errors':
+        return { text: await this.formatErrors(), parse_mode: 'Markdown' };
+      default:
+        return { text: `Callback desconhecido: ${data}` };
     }
   }
 
@@ -105,13 +163,17 @@ export class CommandHandlerService {
     return entries.sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts));
   }
 
+  private sumCost(entries: LogEntry[]): number {
+    return entries.reduce((sum, e) => sum + entryCost(e), 0);
+  }
+
   private async formatStatus(date: Date): Promise<string> {
     const entries = await this.readLogsFor(date);
     const finishes = entries.filter((e) => e.stage === 'turn_finish');
     const latencies = finishes
       .map((e) => e.latency_ms)
       .filter((v): v is number => typeof v === 'number');
-    const totalCost = finishes.reduce((sum, e) => sum + (typeof e.cost_usd === 'number' ? e.cost_usd : 0), 0);
+    const totalCost = this.sumCost(entries);
     const p95 = percentile(latencies, 95);
     return [
       '*Status do dia*',
@@ -121,27 +183,41 @@ export class CommandHandlerService {
     ].join('\n');
   }
 
+  private async resolveDebugTurnId(
+    turnIdArg: string | undefined,
+    fallbackTurnId: string,
+  ): Promise<string> {
+    if (turnIdArg?.trim()) return turnIdArg.trim();
+    const today = await this.readLogsFor(new Date());
+    const finishes = today.filter((e) => e.stage === 'turn_finish' && e.turn_id);
+    const last = finishes[finishes.length - 1];
+    if (last?.turn_id) return last.turn_id;
+    return fallbackTurnId;
+  }
+
   private async formatDebug(turnIdArg: string | undefined, fallbackTurnId: string): Promise<string> {
-    const turnId = turnIdArg?.trim() || fallbackTurnId;
+    const turnId = await this.resolveDebugTurnId(turnIdArg, fallbackTurnId);
     const today = await this.readLogsFor(new Date());
     const yesterday = await this.readLogsFor(new Date(Date.now() - 86_400_000));
     const matches = [...today, ...yesterday].filter((e) => e.turn_id === turnId);
     if (!matches.length) {
-      return `Nenhum log encontrado para turn_id=${turnId}`;
+      return `Nenhum log encontrado para turn_id=\`${turnId}\``;
     }
-    const lines = matches.map(
-      (e) =>
-        `[${e.stage}] ${e.latency_ms ?? 0}ms` +
-        (e.error ? ` err=${e.error}` : '') +
-        (e.output ? ` out=${JSON.stringify(e.output).slice(0, 80)}` : ''),
-    );
-    return [`*Debug turn* \`${turnId}\``, ...lines].join('\n');
+    const blocks = matches.map((e) => {
+      const lines = [
+        `[${e.stage}] ${e.latency_ms ?? 0}ms`,
+        e.error ? `err=${e.error}` : null,
+        e.output ? `out=${JSON.stringify(e.output).slice(0, 200)}` : null,
+      ].filter(Boolean);
+      return '```\n' + lines.join('\n') + '\n```';
+    });
+    return [`*Debug turn* \`${turnId}\``, ...blocks].join('\n\n');
   }
 
   private formatHelp(): string {
     return [
       '*Comandos disponíveis*',
-      '/status — turns, p95 e custo do dia',
+      '/status — turns, p95 e custo do dia (com botões)',
       '/debug [turn_id] — stages do turn (último se omitido)',
       '/help — esta lista',
       '/costs — breakdown por stage (24h)',
@@ -151,23 +227,49 @@ export class CommandHandlerService {
 
   private async formatCosts(): Promise<string> {
     const entries = await this.readLogsSince(24);
-    const byStage = new Map<string, number>();
+    const byStage = new Map<string, { total: number; count: number }>();
     for (const entry of entries) {
-      const cost = typeof entry.cost_usd === 'number' ? entry.cost_usd : 0;
+      const cost = entryCost(entry);
       if (cost <= 0) continue;
-      byStage.set(entry.stage, (byStage.get(entry.stage) ?? 0) + cost);
+      const prev = byStage.get(entry.stage) ?? { total: 0, count: 0 };
+      byStage.set(entry.stage, { total: prev.total + cost, count: prev.count + 1 });
     }
     if (!byStage.size) return 'Sem custos registrados nas últimas 24h.';
+    const header = 'stage | total $ | count';
     const lines = [...byStage.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .map(([stage, cost]) => `${stage}: $${cost.toFixed(4)}`);
-    return ['*Custos por stage (24h)*', ...lines].join('\n');
+      .sort((a, b) => b[1].total - a[1].total)
+      .map(([stage, { total, count }]) => `${stage} | $${total.toFixed(4)} | ${count}`);
+    return ['*Custos por stage (24h)*', '```', header, ...lines, '```'].join('\n');
+  }
+
+  private async formatRecentTurns(limit: number): Promise<string> {
+    const entries = await this.readLogsFor(new Date());
+    const finishes = entries.filter((e) => e.stage === 'turn_finish');
+    const recent = finishes.slice(-limit);
+    if (!recent.length) return 'Nenhum turno finalizado hoje.';
+    const lines = recent.map((e) => {
+      const cost = typeof e.cost_usd === 'number' ? e.cost_usd : 0;
+      return `\`${e.turn_id ?? '?'}\` — ${e.latency_ms ?? 0}ms — $${cost.toFixed(4)}`;
+    });
+    return [`*Últimos ${recent.length} turnos*`, ...lines].join('\n');
+  }
+
+  private async formatErrors(): Promise<string> {
+    const entries = await this.readLogsFor(new Date());
+    const errors = entries.filter((e) => e.level === 'error' || (e.error && e.error.trim()));
+    if (!errors.length) return 'Nenhum erro registrado hoje.';
+    const lines = errors.slice(-20).map((e) => {
+      const err = e.error ?? e.stage;
+      return `${e.ts} | ${e.stage} | ${String(err).slice(0, 120)}`;
+    });
+    return ['*Erros do dia*', '```', ...lines, '```'].join('\n');
   }
 
   private async formatLog(): Promise<string> {
     const entries = await this.readLogsSince(24);
     const last = entries.slice(-20).map(sanitizeEntry);
     if (!last.length) return 'Nenhuma entrada de log nas últimas 24h.';
-    return ['*Últimas entradas*', '```', JSON.stringify(last, null, 2), '```'].join('\n');
+    const lines = last.map(formatLogLine);
+    return ['*Últimas entradas*', '```', ...lines, '```'].join('\n');
   }
 }

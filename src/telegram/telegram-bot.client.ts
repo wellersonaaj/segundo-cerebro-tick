@@ -7,6 +7,21 @@ export interface TelegramApiResponse<T = unknown> {
   description?: string;
 }
 
+export interface TelegramInlineKeyboardButton {
+  text: string;
+  callback_data: string;
+}
+
+export interface TelegramReplyMarkup {
+  inline_keyboard: TelegramInlineKeyboardButton[][];
+}
+
+export interface TelegramSendOptions {
+  parse_mode?: 'Markdown';
+  reply_markup?: TelegramReplyMarkup;
+  disable_web_page_preview?: boolean;
+}
+
 async function callTelegramApi<T>(
   config: TelegramConfig,
   method: string,
@@ -30,7 +45,7 @@ export async function setTelegramWebhook(config: TelegramConfig): Promise<void> 
   await callTelegramApi(config, 'setWebhook', {
     url: config.webhookUrl,
     secret_token: config.webhookSecret,
-    allowed_updates: ['message', 'edited_message'],
+    allowed_updates: ['message', 'edited_message', 'callback_query'],
     drop_pending_updates: false,
   });
 }
@@ -39,11 +54,40 @@ export async function sendTelegramMessage(
   config: TelegramConfig,
   chatId: number,
   text: string,
+  options?: TelegramSendOptions,
 ): Promise<number> {
   const data = await callTelegramApi<{ message_id: number }>(config, 'sendMessage', {
     chat_id: chatId,
     text,
-    disable_web_page_preview: true,
+    disable_web_page_preview: options?.disable_web_page_preview ?? true,
+    ...(options?.parse_mode ? { parse_mode: options.parse_mode } : {}),
+    ...(options?.reply_markup ? { reply_markup: options.reply_markup } : {}),
   });
   return data.result!.message_id;
+}
+
+export async function editTelegramMessageText(
+  config: TelegramConfig,
+  chatId: number,
+  messageId: number,
+  text: string,
+  options?: Pick<TelegramSendOptions, 'parse_mode' | 'reply_markup'>,
+): Promise<void> {
+  await callTelegramApi(config, 'editMessageText', {
+    chat_id: chatId,
+    message_id: messageId,
+    text,
+    disable_web_page_preview: true,
+    ...(options?.parse_mode ? { parse_mode: options.parse_mode } : {}),
+    ...(options?.reply_markup ? { reply_markup: options.reply_markup } : {}),
+  });
+}
+
+export async function answerTelegramCallbackQuery(
+  config: TelegramConfig,
+  callbackQueryId: string,
+): Promise<void> {
+  await callTelegramApi(config, 'answerCallbackQuery', {
+    callback_query_id: callbackQueryId,
+  });
 }

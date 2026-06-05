@@ -127,7 +127,10 @@ export class TelegramInboxService {
 
     if (routerResult.kind === 'sync_reply') {
       const sendStart = Date.now();
-      await delivery.sendFollowUp(routerResult.text);
+      await delivery.sendFollowUp(routerResult.text, {
+        parse_mode: routerResult.parse_mode,
+        reply_markup: routerResult.reply_markup,
+      });
       await turn?.handle.stage('send', {
         output: {
           message_length: routerResult.text.length,

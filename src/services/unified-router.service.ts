@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { loadEnv } from '../config/env.js';
+import type { TelegramReplyMarkup } from '../telegram/telegram-bot.client.js';
 import type { ParsedTelegramCapture } from '../telegram/parse-update.js';
 import { getCurrentTurn } from '../utils/turn-context.js';
 import { startTurn } from '../utils/structured-logger.js';
@@ -22,7 +23,12 @@ export interface UnifiedRouterInput {
 
 export type UnifiedRouterResult =
   | { kind: 'async_started'; turn_id: string; thread_id: string }
-  | { kind: 'sync_reply'; text: string };
+  | {
+      kind: 'sync_reply';
+      text: string;
+      parse_mode?: 'Markdown';
+      reply_markup?: TelegramReplyMarkup;
+    };
 
 const DISABLED_CLASSIFIER_RESULT: IntentResult = {
   intent: 'save',
@@ -168,6 +174,11 @@ export class UnifiedRouterService {
       });
     }
 
-    return { kind: 'sync_reply', text: response.text };
+    return {
+      kind: 'sync_reply',
+      text: response.text,
+      parse_mode: response.parse_mode,
+      reply_markup: response.reply_markup,
+    };
   }
 }

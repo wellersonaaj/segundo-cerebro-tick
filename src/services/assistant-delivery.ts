@@ -1,4 +1,5 @@
 import type { TelegramConfig } from '../config/telegram.js';
+import type { TelegramSendOptions } from '../telegram/telegram-bot.client.js';
 import { sendTelegramMessage } from '../telegram/telegram-bot.client.js';
 import { log } from '../utils/logger.js';
 import type { AssistantDelivery } from './assistant-turn.types.js';
@@ -8,9 +9,10 @@ export async function sendTelegramMessageSafe(
   chatId: number,
   text: string,
   context?: Record<string, unknown>,
+  options?: TelegramSendOptions,
 ): Promise<number | null> {
   try {
-    const messageId = await sendTelegramMessage(config, chatId, text);
+    const messageId = await sendTelegramMessage(config, chatId, text, options);
     log('info', 'telegram_send', { step: 'sent', chat_id: chatId, message_id: messageId, ...context });
     return messageId;
   } catch (err) {
@@ -29,8 +31,8 @@ export function createTelegramDelivery(
     async sendAck(message: string): Promise<void> {
       await sendTelegramMessageSafe(config, chatId, message, { ...context, phase: 'ack' });
     },
-    async sendFollowUp(message: string): Promise<number | null> {
-      return sendTelegramMessageSafe(config, chatId, message, { ...context, phase: 'follow_up' });
+    async sendFollowUp(message: string, options?: TelegramSendOptions): Promise<number | null> {
+      return sendTelegramMessageSafe(config, chatId, message, { ...context, phase: 'follow_up' }, options);
     },
   };
 }

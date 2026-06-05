@@ -2,7 +2,12 @@ import { randomUUID } from 'node:crypto';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { getTelegramConfig } from '../config/telegram.js';
 import { parseTelegramWebhookBody } from '../telegram/parse-update.js';
+import {
+  answerTelegramCallbackQuery,
+  editTelegramMessageText,
+} from '../telegram/telegram-bot.client.js';
 import { sendTelegramMessageSafe } from '../services/assistant-delivery.js';
+import type { CommandHandlerService } from '../services/command-handler.service.js';
 import type { TelegramInboxService } from '../services/telegram-inbox.service.js';
 import { log } from '../utils/logger.js';
 import { logError, logWebhookReceived } from '../utils/structured-logger.js';
@@ -27,6 +32,7 @@ function isSecretValid(req: FastifyRequest, expected: string): boolean {
 
 export interface TelegramWebhookRouteDeps {
   telegramInbox: TelegramInboxService;
+  commandHandler: CommandHandlerService;
 }
 
 export async function registerTelegramWebhookRoutes(
@@ -49,6 +55,41 @@ export async function registerTelegramWebhookRoutes(
     }
     if (parsed.kind === 'ignored') {
       return reply.send({ ok: true, ignored: true, reason: parsed.reason });
+    }
+
+    if (parsed.kind === 'callback') {
+      const { callback } = parsed;
+      if (callback.userId !== config.allowedUserId) {
+        return reply.status(403).send({ error: 'User not allowed' });
+      }
+
+      reply.send({ ok: true, accepted: true, kind: 'callback' });
+
+      void (async () => {
+        try {
+          await answerTelegramCallbackQuery(config, callback.callbackQueryId);
+          if (!callback.data.startsWith('status:')) return;
+          const response = await deps.commandHandler.handleStatusCallback(callback.data);
+          await editTelegramMessageText(
+            config,
+            callback.chatId,
+            callback.messageId,
+            response.text,
+            {
+              parse_mode: response.parse_mode,
+              reply_markup: response.reply_markup,
+            },
+          );
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          log('error', 'telegram_webhook', {
+            step: 'callback_failed',
+            error: message,
+            callback_data: callback.data,
+          });
+        }
+      })();
+      return;
     }
 
     const { capture } = parsed;

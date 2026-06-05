@@ -139,6 +139,7 @@ export async function buildApp(deps: AppDeps = {}) {
       assistantTurn,
       clarificationsRepo,
     ),
+    commandHandler,
   });
 
   const auditService =

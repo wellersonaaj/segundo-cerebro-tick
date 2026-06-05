@@ -245,11 +245,12 @@ describe('Telegram webhook assistant flow', () => {
 
     const { UnifiedRouterService } = await import('../src/services/unified-router.service.js');
     const { CommandHandlerService } = await import('../src/services/command-handler.service.js');
+    const commandHandler = new CommandHandlerService();
     const unifiedRouter = new UnifiedRouterService(
       null,
       assistantTurn,
       null,
-      new CommandHandlerService(),
+      commandHandler,
       false,
     );
 
@@ -265,6 +266,7 @@ describe('Telegram webhook assistant flow', () => {
         assistantTurn,
         null,
       ),
+      commandHandler,
     });
 
     const res = await app.inject({
