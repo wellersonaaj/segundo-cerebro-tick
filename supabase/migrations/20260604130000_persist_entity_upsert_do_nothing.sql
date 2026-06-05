@@ -1,6 +1,29 @@
 -- 20260604130000_persist_entity_upsert_do_nothing.sql
--- Entity upsert: do update set updated_at → do nothing (race hygiene).
--- Keeps due_at_instant ISO regex from 20260604110000_fix_due_at_instant_cast.sql.
+--
+-- Substitui `do update set updated_at = now()` por `do nothing` no upsert
+-- inicial de entities dentro de persist_extraction_candidates.
+--
+-- EFEITO
+--   - Se já existe entity com registry_status IN ('active','candidate') e
+--     mesmo normalized_name: mantém a existente; não atualiza updated_at.
+--     Idempotente e estável em runs paralelos.
+--   - Se não existe nenhuma: cria nova candidate normalmente.
+--
+-- LIMITAÇÃO CONHECIDA (não fecha por completo a race do promote)
+--   Se existe entity rejected/superseded com mesmo normalized_name, o índice
+--   parcial WHERE (active,candidate) não cobre esse caso, então o INSERT
+--   cria uma NOVA candidate. Em runs paralelos isso ainda pode gerar
+--   2 candidates com mesmo nome; ambos viram 'active' no promote e batem
+--   no UNIQUE idx_entities_normalized_name_active.
+--
+--   Para fechar o caso rejected→candidate completamente, tratar rejected
+--   explicitamente no upsert (ex: supersede o rejected antes de inserir,
+--   ou usar índice não-parcial em (normalized_name)). Ficará em
+--   migration 014 quando aplicável.
+--
+-- Body idêntico ao prosrc atual de persist_extraction_candidates; única
+-- diferença: a linha de "do update set updated_at = now()" virou
+-- "do nothing". Conferir antes de aplicar.
 
 create or replace function persist_extraction_candidates(
   p_inbox_item_id uuid,
@@ -38,7 +61,7 @@ declare
   v_cl_id uuid;
   v_result jsonb;
 begin
-  -- 1. Upsert entities (do nothing on conflict — avoids parallel touch noise)
+  -- 1. Upsert entities  *** ÚNICA MUDANÇA: do update → do nothing ***
   for v_entity in select * from jsonb_to_recordset(p_entities) as x(
     name text, entity_type text, normalized_name text
   )
@@ -327,13 +350,8 @@ begin
            then v_tm.due_at_local_date::date else null end,
       case when v_tm.due_at_local_time is not null and v_tm.due_at_local_time != ''
            then v_tm.due_at_local_time::time else null end,
-      case
-        when v_tm.due_at_instant is not null
-         and v_tm.due_at_instant != ''
-         and v_tm.due_at_instant ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
-        then v_tm.due_at_instant::timestamptz
-        else null
-      end,
+      case when v_tm.due_at_instant is not null and v_tm.due_at_instant != ''
+           then v_tm.due_at_instant::timestamptz else null end,
       coalesce(v_tm.due_at_timezone, 'America/Sao_Paulo'),
       v_tm.due_at_precision, v_tm.due_at_status, v_tm.due_at_reason_code,
       v_tm.due_at_normalizer_version,
