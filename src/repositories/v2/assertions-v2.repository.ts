@@ -52,4 +52,56 @@ export class AssertionsV2Repository {
     });
     if (error) throw new Error(`assertions_v2.linkEntity: ${error.message}`);
   }
+
+  async ensureCorrectionAssertionsCurrent(
+    extractionRunId: string,
+    correctionId: string,
+  ): Promise<void> {
+    const { error: linkErr } = await this.db
+      .from('assertions')
+      .update({ correction_id: correctionId })
+      .eq('extraction_run_id', extractionRunId)
+      .is('correction_id', null);
+    if (linkErr) {
+      throw new Error(`assertions_v2.ensureCorrectionAssertionsCurrent link: ${linkErr.message}`);
+    }
+
+    const { data: incoming, error: fetchErr } = await this.db
+      .from('assertions')
+      .select('id, subject_entity_id, predicate')
+      .eq('extraction_run_id', extractionRunId)
+      .eq('record_status', 'active')
+      .eq('assertion_kind', 'status_update')
+      .not('subject_entity_id', 'is', null);
+    if (fetchErr) {
+      throw new Error(`assertions_v2.ensureCorrectionAssertionsCurrent fetch: ${fetchErr.message}`);
+    }
+
+    for (const row of incoming ?? []) {
+      const { error: clearErr } = await this.db
+        .from('assertions')
+        .update({ is_current: false })
+        .eq('assertion_kind', 'status_update')
+        .eq('record_status', 'active')
+        .eq('is_current', true)
+        .eq('subject_entity_id', row.subject_entity_id)
+        .eq('predicate', row.predicate)
+        .neq('id', row.id);
+      if (clearErr) {
+        throw new Error(`assertions_v2.ensureCorrectionAssertionsCurrent clear: ${clearErr.message}`);
+      }
+    }
+
+    const { error: currentErr } = await this.db
+      .from('assertions')
+      .update({ is_current: true })
+      .eq('extraction_run_id', extractionRunId)
+      .eq('record_status', 'active')
+      .eq('assertion_kind', 'status_update')
+      .not('subject_entity_id', 'is', null)
+      .eq('is_current', false);
+    if (currentErr) {
+      throw new Error(`assertions_v2.ensureCorrectionAssertionsCurrent set: ${currentErr.message}`);
+    }
+  }
 }

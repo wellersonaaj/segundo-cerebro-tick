@@ -52,6 +52,14 @@ function isProperNounLike(text: string): boolean {
   return /[A-ZÀ-Ú]/.test(t) || t.split(/\s+/).length >= 2;
 }
 
+function isNonEntityLiteral(ref: string): boolean {
+  const t = ref.trim();
+  if (/^\d+(\.\d+)?\s*(reais?|r\$|%|kg|km|h|min|s|gr|ml|l)\b/i.test(t)) return true;
+  if (/^[\d.,]+\s*(reais?|r\$)/i.test(t)) return true;
+  if (/^\d{1,2}\/\d{1,2}(\/\d{2,4})?$/i.test(t)) return true;
+  return false;
+}
+
 function gapKey(kind: string, ref: string): string {
   return `${kind}:${normalizeText(ref)}`;
 }
@@ -125,6 +133,7 @@ export function aggregateUncertaintyGaps(input: {
 
     for (const mention of output.entity_mentions) {
       const ref = mention.mention_text.trim();
+      if (isNonEntityLiteral(ref)) continue;
       if (!isProperNounLike(ref)) continue;
       if (mention.suggested_entity_type === 'other' || mention.suggested_entity_type === 'topic') {
         add({

@@ -34,6 +34,7 @@ export interface InboxItemProcessSuccess {
 /** Wired in Checkpoint B — v1.4-only extraction pipeline. */
 export interface InboxItemProcessOptions {
   preContextBlock?: string;
+  correctionId?: string;
 }
 
 export interface InboxItemProcessPipeline {

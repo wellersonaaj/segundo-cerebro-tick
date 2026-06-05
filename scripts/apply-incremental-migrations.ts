@@ -26,6 +26,7 @@ const INCREMENTAL_MIGRATIONS = [
   '20260604110000_fix_due_at_instant_cast.sql',
   '20260604120000_cleanup_duplicate_entities.sql',
   '20260604130000_persist_entity_upsert_do_nothing.sql',
+  '20260605180000_fix_correction_assertion_current.sql',
 ] as const;
 
 function fail(msg: string): never {

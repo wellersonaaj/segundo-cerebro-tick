@@ -69,4 +69,23 @@ describe('uncertainty-aggregator ephemeral dedupe', () => {
     const ephemeral = filterPersistableEphemeralGaps(gaps, [pendingClarification]);
     expect(ephemeral).toHaveLength(0);
   });
+
+  it('does not emit unresolved_entity gap for monetary literals like "5 reais"', () => {
+    const gaps = aggregateUncertaintyGaps({
+      clarifications: [],
+      extractorOutput: {
+        ...extractorOutput,
+        entity_mentions: [
+          {
+            mention_text: '5 reais',
+            suggested_entity_type: 'other',
+            source_excerpt: 'comprei café por 5 reais',
+            confidence: 0.7,
+            source_block_reference: '[SOURCE_BLOCK:raw]',
+          },
+        ],
+      },
+    });
+    expect(gaps.some((g) => g.question.includes('5 reais'))).toBe(false);
+  });
 });

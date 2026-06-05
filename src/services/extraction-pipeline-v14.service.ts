@@ -97,6 +97,7 @@ export class ExtractionPipelineV14Service implements InboxItemProcessPipeline {
         extractorVersion: EXTRACTOR_V14_VERSION,
         modelName: env.OPENAI_MODEL,
         inputContentHash,
+        correctionId: options?.correctionId ?? null,
       });
       runId = start.run_id;
 
@@ -146,6 +147,7 @@ export class ExtractionPipelineV14Service implements InboxItemProcessPipeline {
         resolverResult,
         taskSignalResolutions,
         contextResolutionEvidence: compiled.contextResolutionEvidence,
+        correctionId: options?.correctionId,
       });
 
       await this.runsV2Repo.markValidated(runId);

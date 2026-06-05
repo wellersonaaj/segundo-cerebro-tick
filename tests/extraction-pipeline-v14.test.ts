@@ -161,6 +161,20 @@ describe('ExtractionPipelineV14Service', () => {
     expect(runsV2Repo.markValidated).toHaveBeenCalledWith(RUN_ID);
   });
 
+  it('passes correctionId to startExtractionRun and persistCandidates on correction trigger', async () => {
+    const correctionId = 'c0000000-0000-4000-8000-000000000001';
+    const { pipeline, runRpc, persistCandidates } = buildPipeline(baseCompileResult());
+
+    await pipeline.runWithTrigger(inboxItem, 'correction', { correctionId });
+
+    expect(runRpc.startExtractionRun).toHaveBeenCalledWith(
+      expect.objectContaining({ correctionId }),
+    );
+    expect(persistCandidates).toHaveBeenCalledWith(
+      expect.objectContaining({ correctionId }),
+    );
+  });
+
   it('calls compileFromInbox exactly once (single LLM path)', async () => {
     const compileResult = baseCompileResult();
     const { pipeline, compileService } = buildPipeline(compileResult);

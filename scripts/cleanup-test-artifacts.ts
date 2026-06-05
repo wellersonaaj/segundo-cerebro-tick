@@ -13,12 +13,13 @@ import { withTelegramClarificationState } from '../src/telegram/telegram-metadat
 
 loadDotEnv();
 
-/** Inbox items criados na sessão de teste (msgs 151, 153, 156, 159). */
+/** Inbox items criados na sessão de teste (msgs 151, 153, 156, 159, 167). */
 export const DEFAULT_TEST_INBOX_IDS = [
   '5cea6edb-c248-4987-8f1a-8ed2fe029a66',
   'd49981dd-513b-4dce-bec6-c0b2f622e7ae',
   '4e0ce05a-a739-47ea-8380-45e279d028c5',
   'd78c2bb9-1a9e-4e87-b4f5-7ee2070bebab',
+  '6539fe49-c779-4c94-894f-eea62f0560dc',
 ] as const;
 
 /** Clarificações pendentes geradas na mesma sessão. */
@@ -27,6 +28,9 @@ export const DEFAULT_TEST_CLARIFICATION_IDS = [
   'a0fde106-abb8-4b81-bbaf-4b9754049f24',
   'b0fb1cb9-7903-4d8d-b93b-766ecf447aad',
   'a2d7044a-637c-43cd-94f0-fd3bfcc34d2d',
+  '4259b0db-0dd3-4d0b-b32f-e480a9c87619',
+  '054b411f-a31e-4136-aba3-80a0d0f8c0ce',
+  '793648f0-bb7a-4d11-91af-9dfd49144e27',
 ] as const;
 
 const ARCHIVE_REASON = 'orchestrator_test_session_cleanup';
