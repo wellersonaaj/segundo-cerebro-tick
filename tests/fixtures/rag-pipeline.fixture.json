@@ -1,0 +1,55 @@
+[
+  {
+    "name": "no_context",
+    "query": "quando foi a reuniao com Marte?",
+    "retrieval": { "inbox": [], "assertions": [] },
+    "tasks": [],
+    "expected_answer_prefix": "Nao encontrei nada relevante"
+  },
+  {
+    "name": "dense_context_with_citation",
+    "query": "o que sei sobre Breno?",
+    "retrieval": {
+      "inbox": [
+        {
+          "id": "inbox-1",
+          "content": "Almoco com Breno na quinta",
+          "source_channel": "telegram",
+          "occurred_at": "2026-06-01T12:00",
+          "score": 0.9
+        }
+      ],
+      "assertions": []
+    },
+    "compose_response": "Wellerson, voce almocou com Breno na quinta [1].",
+    "expected_has_citation": true
+  },
+  {
+    "name": "verify_fails_adds_fallback",
+    "query": "tarefas pendentes",
+    "retrieval": { "inbox": [], "assertions": [] },
+    "tasks": [{ "id": "t1", "title": "Pagar conta", "due_at_local_date": "2026-06-10", "due_at_local_time": null, "status": "open", "source_excerpt": null }],
+    "compose_response": "Voce tem compromissos pendentes.",
+    "expected_contains_fallback": true
+  },
+  {
+    "name": "rerank_keeps_top_scores",
+    "query": "consulta medica",
+    "items": [
+      { "id": "a", "content": "consulta cardiologista", "source_channel": "telegram", "occurred_at": "", "score": 1 },
+      { "id": "b", "content": "comprei pao", "source_channel": "telegram", "occurred_at": "", "score": 0.5 }
+    ],
+    "rerank_scores": ["9", "2"],
+    "keep": 1,
+    "expected_top_id": "a"
+  },
+  {
+    "name": "confidence_average",
+    "query": "status projeto",
+    "sources": [
+      { "id": "1", "content": "x", "source_channel": "telegram", "occurred_at": "", "score": 8 },
+      { "id": "2", "content": "y", "source_channel": "telegram", "occurred_at": "", "score": 6 }
+    ],
+    "expected_confidence": 7
+  }
+]
