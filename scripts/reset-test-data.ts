@@ -3,6 +3,7 @@
  * Uso manual apenas — nunca chamar em runtime nem em npm test.
  *
  *   ALLOW_TEST_DATA_RESET=true npm run reset:test-data
+ *   ALLOW_TEST_DATA_RESET=true RESET_SKIP_GENIUS_SEED=true npm run reset:test-data
  */
 
 import { loadDotEnv } from '../src/config/load-dotenv.js';
@@ -131,8 +132,12 @@ export async function runHomologReset(supabase: SupabaseClient): Promise<void> {
   await deleteAllRows(supabase, 'entity_aliases');
   await deleteAllRows(supabase, 'entities');
 
-  console.log('\nRecriando seed controlado…\n');
-  await ensureGeniusSeed(supabase);
+  if (process.env.RESET_SKIP_GENIUS_SEED === 'true') {
+    ok('seed Genius Hotels omitido (RESET_SKIP_GENIUS_SEED=true)');
+  } else {
+    console.log('\nRecriando seed controlado…\n');
+    await ensureGeniusSeed(supabase);
+  }
 }
 
 export async function verifyHomologReset(supabase: SupabaseClient): Promise<void> {
@@ -146,7 +151,8 @@ export async function verifyHomologReset(supabase: SupabaseClient): Promise<void
     counts.push({ table, count: count ?? 0 });
   }
 
-  const result = evaluateResetCounts(counts, { geniusSeedExpected: true });
+  const geniusSeedExpected = process.env.RESET_SKIP_GENIUS_SEED !== 'true';
+  const result = evaluateResetCounts(counts, { geniusSeedExpected });
   console.log('\nVerificação pós-reset:');
   for (const [table, n] of Object.entries(result.counts)) {
     console.log(`  ${table}: ${n}`);
