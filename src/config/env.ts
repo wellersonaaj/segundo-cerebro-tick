@@ -19,6 +19,17 @@ const envSchema = z.object({
   TELEGRAM_DEFAULT_TIMEZONE: z.string().min(1).default('America/Sao_Paulo'),
   TELEGRAM_SENDER_ENTITY_REFERENCE: z.string().min(1).optional(),
   INTERNAL_PROCESSING_SECRET: z.string().min(1).optional(),
+
+  // Orquestrador unificado (Fase 0-6)
+  LOG_DIR: z.string().min(1).optional(),
+  INTENT_CLASSIFIER_ENABLED: z
+    .string()
+    .optional()
+    .transform((v) => v !== 'false'),
+  INTENT_CLASSIFIER_MODEL: z.string().min(1).default('gpt-5-mini'),
+  RAG_RETRIEVAL_TOP_K: z.coerce.number().int().positive().default(10),
+  RAG_RERANK_KEEP_INBOX: z.coerce.number().int().positive().default(5),
+  RAG_RERANK_KEEP_ASSERTIONS: z.coerce.number().int().positive().default(3),
   EXTERNAL_KNOWLEDGE_ENRICHMENT_ENABLED: z
     .string()
     .optional()
