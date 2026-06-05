@@ -9,6 +9,7 @@ export interface OpenAiRagClient {
     model: string;
     messages: ChatMessage[];
     max_completion_tokens: number;
+    reasoning_effort?: 'low' | 'medium' | 'high';
   }): Promise<{ content: string; finish_reason?: string }>;
 }
 
@@ -31,6 +32,7 @@ export class FetchOpenAiRagClient implements OpenAiRagClient {
     model: string;
     messages: ChatMessage[];
     max_completion_tokens: number;
+    reasoning_effort?: 'low' | 'medium' | 'high';
   }): Promise<{ content: string; finish_reason?: string }> {
     const data = await this.request<{
       choices: Array<{ finish_reason?: string; message: { content: string } }>;

@@ -1,8 +1,35 @@
+import { log } from '../utils/logger.js';
 import type { OpenAiRagClient } from './rag/openai-rag.client.js';
 import type { OpenTaskRow, RankedRow } from './rag/rag.types.js';
 
 const DEFAULT_COMPOSE_MODEL = 'gpt-5-mini';
-const DEFAULT_COMPOSE_MAX_TOKENS = 1500;
+const DEFAULT_COMPOSE_MAX_TOKENS = 3000;
+
+const LENGTH_TRUNCATED_SUFFIX = ' (continua...)';
+const LENGTH_EMPTY_FALLBACK =
+  'Pergunta complexa demais pra responder agora. Tenta reformular mais curto?';
+
+export function resolveComposeContent(content: string, finish_reason?: string): string {
+  const trimmed = content.trim();
+
+  if (finish_reason === 'length') {
+    log('warn', 'composer', {
+      step: 'finish_reason_length',
+      finish_reason,
+      content_length: trimmed.length,
+    });
+    if (trimmed) {
+      return `${trimmed}${LENGTH_TRUNCATED_SUFFIX}`;
+    }
+    return LENGTH_EMPTY_FALLBACK;
+  }
+
+  if (!trimmed) {
+    throw new Error(`compose: empty content (finish_reason=${finish_reason ?? 'n/a'})`);
+  }
+
+  return trimmed;
+}
 
 export class ComposerService {
   constructor(
@@ -63,10 +90,9 @@ RESPOSTA:`;
       model,
       messages: [{ role: 'user', content: prompt }],
       max_completion_tokens: this.maxCompletionTokens,
+      reasoning_effort: 'low',
     });
-    if (!content || content.trim() === '') {
-      throw new Error(`compose: empty content (finish_reason=${finish_reason ?? 'n/a'})`);
-    }
-    return content;
+
+    return resolveComposeContent(content, finish_reason);
   }
 }
