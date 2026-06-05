@@ -2,6 +2,28 @@ import type { CompiledClarificationCandidateV2 } from './memory-compiler-v2.js';
 
 export type ClarificationMateriality = 'blocking' | 'non_blocking' | 'discarded';
 
+/** Valores persistidos em clarification_requests (check constraint no DB). */
+export type PersistedClarificationMateriality = 'blocking' | 'non_blocking';
+
+export function materialityFromFields(fields: {
+  blocking_scope: string;
+  issue_type: string;
+  priority: string;
+}): PersistedClarificationMateriality {
+  const isKcIdentity =
+    fields.blocking_scope === 'knowledge_confirmation' &&
+    (fields.issue_type === 'ambiguous_entity_identity' ||
+      (fields.issue_type === 'ambiguous_entity_type' && fields.priority === 'high'));
+  const isBlocking =
+    fields.blocking_scope === 'external_action' ||
+    isKcIdentity ||
+    (fields.blocking_scope !== 'none' &&
+      fields.blocking_scope !== 'knowledge_confirmation' &&
+      fields.blocking_scope !== 'enrichment' &&
+      fields.priority !== 'low');
+  return isBlocking ? 'blocking' : 'non_blocking';
+}
+
 export interface ClassifiedClarificationV2 extends CompiledClarificationCandidateV2 {
   materiality: ClarificationMateriality;
 }
@@ -34,22 +56,17 @@ export function classifyClarifications(
 
     // external_action sempre bloqueia; enrichment sempre non_blocking
     // knowledge_confirmation: non_blocking por padrão, EXCETO ambiguous_entity_identity (diretriz §7)
-    const isKcIdentity =
-      c.blockingScope === 'knowledge_confirmation' &&
-      (c.issueType === 'ambiguous_entity_identity' || c.issueType === 'ambiguous_entity_type' && c.priority === 'high');
-    const isBlocking =
-      c.blockingScope === 'external_action' ||
-      isKcIdentity ||
-      (c.blockingScope !== 'none' &&
-        c.blockingScope !== 'knowledge_confirmation' &&
-        c.blockingScope !== 'enrichment' &&
-        c.priority !== 'low');
+    const materiality = materialityFromFields({
+      blocking_scope: c.blockingScope,
+      issue_type: c.issueType,
+      priority: c.priority,
+    });
     const classified: ClassifiedClarificationV2 = {
       ...c,
-      materiality: isBlocking ? 'blocking' : 'non_blocking',
+      materiality,
     };
 
-    if (isBlocking) {
+    if (materiality === 'blocking') {
       blocking.push(classified);
     } else {
       nonBlocking.push(classified);

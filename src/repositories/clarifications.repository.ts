@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { materialityFromFields } from '../types/clarification-types.js';
 import type { ClarificationRequest, ClarificationStatus, ExtractedClarification } from '../types/domain.js';
 import { normalizeText } from '../utils/normalize.js';
 
@@ -28,6 +29,11 @@ export class ClarificationsRepository {
       reason: c.reason,
       priority: c.priority,
       blocking_scope: c.blocking_scope,
+      materiality: materialityFromFields({
+        blocking_scope: c.blocking_scope,
+        issue_type: c.issue_type,
+        priority: c.priority,
+      }),
       suggested_answers: c.suggested_answers,
       source_excerpt: c.source_excerpt,
       status: 'pending' as const,
