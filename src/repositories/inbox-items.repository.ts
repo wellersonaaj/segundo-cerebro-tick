@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { buildIlikeOrFilter } from '../db/postgrest-filter-utils.js';
+import { getTelegramChatId } from '../telegram/telegram-metadata.js';
 import type { InboxItem, ProcessingStatus, SourceMode } from '../types/domain.js';
 
 export interface ListRecentInboxItemsInput {
@@ -95,9 +96,7 @@ export class InboxItemsRepository {
 
     return (data ?? []).filter((row) => {
       const meta = row.metadata as Record<string, unknown> | null | undefined;
-      const telegram = meta?.telegram;
-      if (!telegram || typeof telegram !== 'object') return false;
-      return (telegram as { chat_id?: unknown }).chat_id === chatId;
+      return getTelegramChatId(meta) === chatId;
     }) as InboxItemRow[];
   }
 

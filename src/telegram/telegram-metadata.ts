@@ -13,7 +13,9 @@ export function getTelegramChatId(metadata: Record<string, unknown> | null | und
   const telegram = metadata?.telegram;
   if (!telegram || typeof telegram !== 'object') return null;
   const chatId = (telegram as { chat_id?: unknown }).chat_id;
-  return typeof chatId === 'number' ? chatId : null;
+  if (typeof chatId === 'number' && Number.isFinite(chatId)) return chatId;
+  if (typeof chatId === 'string' && /^\d+$/.test(chatId.trim())) return Number(chatId.trim());
+  return null;
 }
 
 export function getTelegramClarificationState(

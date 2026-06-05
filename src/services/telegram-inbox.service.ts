@@ -12,7 +12,11 @@ import { createTelegramDelivery } from './assistant-delivery.js';
 import type { UnifiedRouterService } from './unified-router.service.js';
 import type { AssistantTurnService } from './assistant-turn.service.js';
 import { AssistantTurnService as AssistantTurnServiceClass } from './assistant-turn.service.js';
-import { TelegramClarificationQueueService } from './telegram-clarification-queue.service.js';
+import {
+  logClarificationLookup,
+  TelegramClarificationQueueService,
+  type ClarificationLookupTraceEntry,
+} from './telegram-clarification-queue.service.js';
 import { getCurrentTurn } from '../utils/turn-context.js';
 
 export function buildTelegramInboxMetadata(
@@ -138,18 +142,12 @@ export class TelegramInboxService {
   ): Promise<TelegramHandleResult | null> {
     if (!this.clarificationQueue) return null;
 
-    let ctx =
-      capture.replyToMessageId != null
-        ? await this.clarificationQueue.findByPromptMessageId(
-            capture.chatId,
-            capture.replyToMessageId,
-          )
-        : null;
-
-    if (!ctx) {
-      const active = await this.clarificationQueue.findActiveClarificationForChat(capture.chatId);
-      if (active) ctx = active;
-    }
+    const trace: ClarificationLookupTraceEntry[] = [];
+    const ctx = await this.clarificationQueue.findPendingClarificationForChat(capture.chatId, {
+      replyToMessageId: capture.replyToMessageId,
+      trace,
+    });
+    logClarificationLookup(capture.chatId, text, trace, ctx);
 
     if (!ctx) return null;
 
