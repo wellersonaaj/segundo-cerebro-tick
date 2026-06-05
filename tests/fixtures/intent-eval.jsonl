@@ -1,0 +1,20 @@
+{"text":"marquei consulta com Breno quinta 14h","expected":"save","note":"captura de compromisso com pessoa e horário"}
+{"text":"comprei pão na padaria por 12 reais","expected":"save","note":"gasto do dia a dia"}
+{"text":"ideia: integrar o observer com o webhook principal","expected":"save","note":"nota de produto/projeto"}
+{"text":"lembrete: pagar internet dia 10","expected":"save","note":"lembrete financeiro"}
+{"text":"almocei com a Lari hoje, falei do projeto ESX","expected":"save","note":"captura social + contexto trabalho"}
+{"text":"na verdade era sexta, não quinta","expected":"update","note":"correção de data após captura recente"}
+{"text":"esquece o Breno, era com João","expected":"update","note":"correção de pessoa referenciada"}
+{"text":"corrige: o valor era 120 reais, não 12","expected":"update","note":"correção numérica explícita"}
+{"text":"o que eu tenho com Breno essa semana?","expected":"query","note":"pergunta sobre agenda/memória de pessoa"}
+{"text":"quando foi que eu falei sobre React?","expected":"query","note":"busca temporal na memória"}
+{"text":"tem alguma task aberta sobre o projeto ESX?","expected":"query","note":"pergunta sobre tarefas"}
+{"text":"o que eu anotei sobre a Lari?","expected":"query","note":"recall de menções a pessoa"}
+{"text":"quais compromissos tenho essa semana?","expected":"query","note":"agenda da semana"}
+{"text":"me resume o que tenho pendente com Bruno","expected":"query","note":"status pendências com pessoa"}
+{"text":"onde foi que eu comentei sobre pomodoro?","expected":"query","note":"busca por tema na memória"}
+{"text":"/status","expected":"command","note":"comando operacional"}
+{"text":"/debug abc-123","expected":"command","note":"comando debug com turn_id"}
+{"text":"/help","expected":"command","note":"comando ajuda"}
+{"text":"Breno","expected":"save","note":"ambíguo — só nome, default seguro é captura"}
+{"text":"ok","expected":"save","note":"ambíguo — confirmação curta sem contexto, default save"}
