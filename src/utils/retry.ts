@@ -47,6 +47,21 @@ function defaultIsRetryable(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
   const msg = err.message.toLowerCase();
 
+  // Auth/config errors — these will NOT be fixed by retrying. Fail fast.
+  if (
+    msg.includes(' 401') ||
+    msg.includes('unauthorized') ||
+    msg.includes('incorrect api key') ||
+    msg.includes('invalid api key') ||
+    msg.includes(' 403') ||
+    msg.includes('forbidden') ||
+    msg.includes(' 400') ||
+    msg.includes('bad request') ||
+    msg.includes('validation')
+  ) {
+    return false;
+  }
+
   // OpenAI SDK timeouts
   if (msg.includes('timeout') || msg.includes('etimedout')) return true;
 

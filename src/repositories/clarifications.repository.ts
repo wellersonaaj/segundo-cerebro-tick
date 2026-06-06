@@ -29,11 +29,14 @@ export class ClarificationsRepository {
       reason: c.reason,
       priority: c.priority,
       blocking_scope: c.blocking_scope,
-      materiality: materialityFromFields({
-        blocking_scope: c.blocking_scope,
-        issue_type: c.issue_type,
-        priority: c.priority,
-      }),
+      materiality:
+        c.materiality ??
+        materialityFromFields({
+          blocking_scope: c.blocking_scope ?? 'none',
+          issue_type: c.issue_type ?? 'other',
+          priority: c.priority ?? 'medium',
+        }) ??
+        'non_blocking',
       suggested_answers: c.suggested_answers,
       source_excerpt: c.source_excerpt,
       status: 'pending' as const,

@@ -50,6 +50,26 @@ describe('withRetry', () => {
     expect(fn).toHaveBeenCalledTimes(1);
   });
 
+  it('does NOT retry 401 Incorrect API key (config error, not transient)', async () => {
+    const fn = vi.fn(async () => {
+      throw new Error('OpenAI extractor-v1.4 failed: 401 Incorrect API key provided');
+    });
+    await expect(
+      withRetry(fn, { maxAttempts: 3, baseDelayMs: 1 }),
+    ).rejects.toThrow('401');
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it('does NOT retry 403 forbidden', async () => {
+    const fn = vi.fn(async () => {
+      throw new Error(' 403 Forbidden: bot was blocked');
+    });
+    await expect(
+      withRetry(fn, { maxAttempts: 3, baseDelayMs: 1 }),
+    ).rejects.toThrow('403');
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
   it('retries 429 rate limit', async () => {
     let calls = 0;
     const fn = vi.fn(async () => {
