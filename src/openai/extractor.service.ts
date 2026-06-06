@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { loadEnv } from '../config/env.js';
 import type { ExtractorOutput } from '../types/domain.js';
 import { log } from '../utils/logger.js';
+import { withRetry } from '../utils/retry.js';
 import {
   EXTRACTOR_SYSTEM_PROMPT,
   EXTRACTOR_VERSION,
@@ -41,21 +42,37 @@ export function createOpenAiExtractor(): ExtractFn {
 
     let response: Awaited<ReturnType<typeof client.responses.create>>;
     try {
-      response = await client.responses.create({
-        model: env.OPENAI_MODEL,
-        input: [
-          { role: 'system', content: EXTRACTOR_SYSTEM_PROMPT },
-          { role: 'user', content: userMessage },
-        ],
-        text: {
-          format: {
-            type: 'json_schema',
-            name: 'extractor_output',
-            schema: extractorJsonSchema,
-            strict: true,
+      response = await withRetry(
+        () =>
+          client.responses.create({
+            model: env.OPENAI_MODEL,
+            input: [
+              { role: 'system', content: EXTRACTOR_SYSTEM_PROMPT },
+              { role: 'user', content: userMessage },
+            ],
+            text: {
+              format: {
+                type: 'json_schema',
+                name: 'extractor_output',
+                schema: extractorJsonSchema,
+                strict: true,
+              },
+            },
+          }),
+        {
+          maxAttempts: 3,
+          baseDelayMs: 1000,
+          onRetry: (attempt, err, delay) => {
+            log('warn', 'inbox_flow', {
+              step: 'openai_request_retry',
+              inbox_item_id: params.inbox_item_id,
+              attempt,
+              delay_ms: delay,
+              error: err instanceof Error ? err.message : String(err),
+            });
           },
         },
-      });
+      );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       log('error', 'inbox_flow', {

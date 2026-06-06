@@ -111,7 +111,7 @@ describe('IntentClassifierService', () => {
     expect(result.reasoning).toContain('llm error');
   });
 
-  it('uses reasoning_effort low and 500 max tokens by default', async () => {
+  it('uses reasoning_effort low and 1500 max tokens by default', async () => {
     const llm: IntentClassifierLlmClient = {
       completeJson: vi.fn(async () => ({
         content: JSON.stringify({
@@ -125,7 +125,7 @@ describe('IntentClassifierService', () => {
     const service = new IntentClassifierService(llm);
     await service.classify('o que eu tenho com Breno?');
     expect(llm.completeJson).toHaveBeenCalledWith(
-      expect.objectContaining({ maxTokens: 500 }),
+      expect.objectContaining({ maxTokens: 1500 }),
     );
   });
 });

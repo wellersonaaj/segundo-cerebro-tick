@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import { z } from 'zod';
 import { loadEnv } from '../config/env.js';
 import { log } from '../utils/logger.js';
+import { withRetry } from '../utils/retry.js';
 import {
   EXTRACTOR_V14_PROMPT_VERSION,
   EXTRACTOR_V14_SYSTEM_PROMPT,
@@ -45,21 +46,36 @@ export function createOpenAiExtractorV14(): ExtractV14Fn {
 
     let response: Awaited<ReturnType<typeof client.responses.create>>;
     try {
-      response = await client.responses.create({
-        model: env.OPENAI_MODEL,
-        input: [
-          { role: 'system', content: EXTRACTOR_V14_SYSTEM_PROMPT },
-          { role: 'user', content: userMessage },
-        ],
-        text: {
-          format: {
-            type: 'json_schema',
-            name: 'extractor_output_v14',
-            schema: extractorV14JsonSchema,
-            strict: true,
+      response = await withRetry(
+        () =>
+          client.responses.create({
+            model: env.OPENAI_MODEL,
+            input: [
+              { role: 'system', content: EXTRACTOR_V14_SYSTEM_PROMPT },
+              { role: 'user', content: userMessage },
+            ],
+            text: {
+              format: {
+                type: 'json_schema',
+                name: 'extractor_output_v14',
+                schema: extractorV14JsonSchema,
+                strict: true,
+              },
+            },
+          }),
+        {
+          maxAttempts: 3,
+          baseDelayMs: 1000,
+          onRetry: (attempt, err, delay) => {
+            log('warn', 'extractor_v14', {
+              step: 'openai_request_retry',
+              attempt,
+              delay_ms: delay,
+              error: err instanceof Error ? err.message : String(err),
+            });
           },
         },
-      });
+      );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       log('error', 'extractor_v14', { step: 'openai_request_failed', error: message });

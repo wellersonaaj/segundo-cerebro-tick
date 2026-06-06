@@ -21,7 +21,7 @@ describe('resolveComposeContent', () => {
 });
 
 describe('ComposerService', () => {
-  it('passes reasoning_effort low and max_completion_tokens 3000', async () => {
+  it('passes reasoning_effort low and max_completion_tokens 6000', async () => {
     const chatCompletion = vi.fn(async () => ({
       content: 'Voce tem consulta com Breno na quinta.',
       finish_reason: 'stop',
@@ -46,7 +46,7 @@ describe('ComposerService', () => {
     expect(chatCompletion).toHaveBeenCalledWith(
       expect.objectContaining({
         reasoning_effort: 'low',
-        max_completion_tokens: 3000,
+        max_completion_tokens: 6000,
       }),
     );
   });

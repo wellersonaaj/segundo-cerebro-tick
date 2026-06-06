@@ -3,7 +3,7 @@ import type { OpenAiRagClient } from './rag/openai-rag.client.js';
 import type { OpenTaskRow, RankedRow } from './rag/rag.types.js';
 
 const DEFAULT_COMPOSE_MODEL = 'gpt-5-mini';
-const DEFAULT_COMPOSE_MAX_TOKENS = 3000;
+const DEFAULT_COMPOSE_MAX_TOKENS = 6000;
 
 const LENGTH_TRUNCATED_SUFFIX = ' (continua...)';
 const LENGTH_EMPTY_FALLBACK =

@@ -16,6 +16,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e:smoke": "tsx scripts/e2e-smoke-test.ts",
+    "test:stress:10msg": "tsx scripts/stress-test-10msgs.ts",
     "test:mcp:smoke": "tsx scripts/mcp-smoke-test.ts",
     "test:clarification:smoke": "tsx scripts/clarification-smoke-test.ts",
     "test:correction:smoke": "tsx scripts/correction-smoke-test.ts",

@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import { z } from 'zod';
 import { loadEnv } from '../config/env.js';
 import { log } from '../utils/logger.js';
+import { withRetry } from '../utils/retry.js';
 import {
   buildIntentClassifierUserMessage,
   INTENT_CLASSIFIER_SYSTEM_PROMPT,
@@ -50,7 +51,7 @@ const SAFE_FALLBACK: IntentResult = {
   reasoning: 'fallback seguro',
 };
 
-const DEFAULT_CLASSIFIER_MAX_TOKENS = 500;
+const DEFAULT_CLASSIFIER_MAX_TOKENS = 1500;
 
 export class OpenAiIntentClassifierClient implements IntentClassifierLlmClient {
   constructor(private readonly client: OpenAI) {}
@@ -61,16 +62,31 @@ export class OpenAiIntentClassifierClient implements IntentClassifierLlmClient {
     user: string;
     maxTokens: number;
   }): Promise<IntentClassifierLlmResult> {
-    const response = await this.client.chat.completions.create({
-      model: input.model,
-      messages: [
-        { role: 'system', content: input.system },
-        { role: 'user', content: input.user },
-      ],
-      response_format: { type: 'json_object' },
-      max_completion_tokens: input.maxTokens,
-      reasoning_effort: 'low',
-    });
+    const response = await withRetry(
+      () =>
+        this.client.chat.completions.create({
+          model: input.model,
+          messages: [
+            { role: 'system', content: input.system },
+            { role: 'user', content: input.user },
+          ],
+          response_format: { type: 'json_object' },
+          max_completion_tokens: input.maxTokens,
+          reasoning_effort: 'low',
+        }),
+      {
+        maxAttempts: 3,
+        baseDelayMs: 800,
+        onRetry: (attempt, err, delay) => {
+          log('warn', 'intent_classifier', {
+            step: 'llm_retry',
+            attempt,
+            delay_ms: delay,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        },
+      },
+    );
     const choice = response.choices[0];
     return {
       content: choice?.message?.content ?? '',
