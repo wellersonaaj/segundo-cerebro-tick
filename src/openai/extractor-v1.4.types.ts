@@ -28,7 +28,17 @@ export function rejectLegacyExtractorRootFields(value: unknown): void {
   }
 }
 
-const entityTypeEnum = z.enum([
+/**
+ * Canonical entity types for extractor-v1.4 output.
+ * Single source of truth — both the Zod validator (below) and the JSON Schema
+ * (src/openai/extractor-v1.4.schema.ts) MUST derive their enums from this list.
+ *
+ * Types that DO NOT enter the automatic registry (per mvp-registry-policy) are
+ * included here on purpose: 'temporal' and 'measurement' are valid context
+ * signals the LLM is prompted to emit, and they are filtered out downstream by
+ * `isMvpAutoRegistryEntityType` before any DB write.
+ */
+export const EXTRACTOR_V14_ENTITY_TYPES = [
   'person',
   'company',
   'project',
@@ -36,8 +46,14 @@ const entityTypeEnum = z.enum([
   'topic',
   'document',
   'location',
+  'temporal',
+  'measurement',
   'other',
-]);
+] as const;
+
+export type ExtractorV14EntityType = (typeof EXTRACTOR_V14_ENTITY_TYPES)[number];
+
+const entityTypeEnum = z.enum(EXTRACTOR_V14_ENTITY_TYPES);
 
 const extractedEntityMentionSchema = z.object({
   mention_text: z.string().min(1),
@@ -365,5 +381,48 @@ export type ReviewHint = z.infer<typeof reviewHintSchema>;
 
 export function parseExtractorOutputV14(value: unknown): ExtractorOutputV14 {
   rejectLegacyExtractorRootFields(value);
-  return extractorOutputV14Schema.parse(value);
+  const sanitized = sanitizeEntityTypes(value);
+  return extractorOutputV14Schema.parse(sanitized);
+}
+
+/**
+ * Defense in depth: if the LLM emits a `suggested_entity_type` outside the
+ * canonical enum (e.g. a future model version invents a new category before we
+ * update EXTRACTOR_V14_ENTITY_TYPES), coerce to 'other' and log a warning
+ * instead of failing the whole extraction. Downstream code (memory-compiler-v2)
+ * already drops non-registry types, so the system stays consistent.
+ *
+ * Sanitization runs BEFORE the Zod parse so the schema accepts the result
+ * (the coerce-on-output approach in earlier versions could not run because
+ * ZodError aborted the parse).
+ */
+function sanitizeEntityTypes(value: unknown): unknown {
+  if (value == null || typeof value !== 'object' || Array.isArray(value)) return value;
+  const record = value as Record<string, unknown>;
+  const mentions = record.entity_mentions;
+  if (!Array.isArray(mentions)) return value;
+
+  const allowed = new Set<string>(EXTRACTOR_V14_ENTITY_TYPES);
+  const clonedMentions: unknown[] = [];
+
+  for (let i = 0; i < mentions.length; i++) {
+    const m = mentions[i];
+    if (m == null || typeof m !== 'object' || Array.isArray(m)) {
+      clonedMentions.push(m);
+      continue;
+    }
+    const mentionRecord = m as Record<string, unknown>;
+    const type = mentionRecord.suggested_entity_type;
+    if (typeof type === 'string' && !allowed.has(type)) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[extractor-v1.4] unknown suggested_entity_type "${type}" for mention "${mentionRecord.mention_text}" — coercing to "other"`,
+      );
+      clonedMentions.push({ ...mentionRecord, suggested_entity_type: 'other' });
+    } else {
+      clonedMentions.push(m);
+    }
+  }
+
+  return { ...record, entity_mentions: clonedMentions };
 }

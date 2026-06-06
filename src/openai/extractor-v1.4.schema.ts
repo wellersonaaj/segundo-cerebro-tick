@@ -1,4 +1,4 @@
-import { CLARIFICATION_ISSUE_TYPES } from './extractor-v1.4.types.js';
+import { CLARIFICATION_ISSUE_TYPES, EXTRACTOR_V14_ENTITY_TYPES } from './extractor-v1.4.types.js';
 
 /** JSON Schema for OpenAI Structured Outputs — extractor-v1.4 */
 export const extractorV14JsonSchema = {
@@ -15,18 +15,7 @@ export const extractorV14JsonSchema = {
           mention_text: { type: 'string' },
           suggested_entity_type: {
             type: 'string',
-            enum: [
-              'person',
-              'company',
-              'project',
-              'product',
-              'topic',
-              'document',
-              'location',
-              'temporal',
-              'measurement',
-              'other',
-            ],
+            enum: [...EXTRACTOR_V14_ENTITY_TYPES],
           },
           source_excerpt: { type: 'string' },
           confidence: { type: 'number' },

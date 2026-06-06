@@ -10,6 +10,7 @@ import {
   parseExtractorOutputV14,
   rejectLegacyExtractorRootFields,
   CLARIFICATION_ISSUE_TYPES,
+  EXTRACTOR_V14_ENTITY_TYPES,
 } from '../src/openai/extractor-v1.4.types.js';
 import { EXTRACTOR_V14_SCHEMA_VERSION } from '../src/openai/extractor-v1.4.prompt.js';
 import { extractorV14JsonSchema } from '../src/openai/extractor-v1.4.schema.js';
@@ -326,5 +327,74 @@ describe('extractor-v1.4 dataset cases', () => {
       expect(c.scenario_id).toBeTruthy();
       expect(c.raw_content.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('extractor-v1.4 entity_mention type coverage', () => {
+  const emptyV14 = () => ({
+    schema_version: '1.4' as const,
+    entity_mentions: [] as unknown[],
+    aliases: [],
+    events: [],
+    correction_signals: [],
+    assertions: [],
+    task_signals: [],
+    clarification_candidates: [],
+    review_hints: [],
+    extraction_notes: [],
+  });
+
+  it('accepts temporal entity type (LLM-authorized, dropped downstream)', () => {
+    const out = parseExtractorOutputV14({
+      ...emptyV14(),
+      entity_mentions: [
+        {
+          mention_text: 'sábado à noite',
+          suggested_entity_type: 'temporal',
+          source_excerpt: 'sábado à noite',
+          confidence: 0.9,
+        },
+      ],
+    });
+    expect(out.entity_mentions[0]?.suggested_entity_type).toBe('temporal');
+  });
+
+  it('accepts measurement entity type (LLM-authorized, dropped downstream)', () => {
+    const out = parseExtractorOutputV14({
+      ...emptyV14(),
+      entity_mentions: [
+        {
+          mention_text: '5 reais',
+          suggested_entity_type: 'measurement',
+          source_excerpt: '5 reais',
+          confidence: 0.9,
+        },
+      ],
+    });
+    expect(out.entity_mentions[0]?.suggested_entity_type).toBe('measurement');
+  });
+
+  it('rejects truly unknown entity types (defense in depth coerces to other)', () => {
+    const out = parseExtractorOutputV14({
+      ...emptyV14(),
+      entity_mentions: [
+        {
+          mention_text: 'coisa inventada',
+          suggested_entity_type: 'banana',
+          source_excerpt: 'coisa inventada',
+          confidence: 0.5,
+        },
+      ],
+    });
+    // Coerced by coerceUnknownEntityTypes — no throw, type falls back to 'other'.
+    expect(out.entity_mentions[0]?.suggested_entity_type).toBe('other');
+  });
+});
+
+describe('extractor-v1.4 schema/Zod drift guard', () => {
+  it('JSON schema enum matches EXTRACTOR_V14_ENTITY_TYPES (no drift)', () => {
+    const jsonSchemaTypes = extractorV14JsonSchema.properties.entity_mentions.items
+      .properties.suggested_entity_type.enum as readonly string[];
+    expect([...jsonSchemaTypes].sort()).toEqual([...EXTRACTOR_V14_ENTITY_TYPES].sort());
   });
 });
