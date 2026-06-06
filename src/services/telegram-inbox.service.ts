@@ -167,7 +167,14 @@ export class TelegramInboxService {
       if (byReply) return { will_try_resolve: true };
     }
 
-    if (looksLikeClarificationAnswer(text)) {
+    // Fetch the pending clarification so we can pass its suggested_answers
+    // to the answer-shape heuristic. Without this, a user replying with the
+    // literal text of an option (e.g. "Gabriel Xavier" instead of "3") was
+    // treated as a new save instead of an answer.
+    const pending = await this.clarificationQueue.findNewestPendingForChat(capture.chatId);
+    const suggestedAnswers = pending?.clarification.suggested_answers ?? [];
+
+    if (looksLikeClarificationAnswer(text, suggestedAnswers)) {
       return { will_try_resolve: true };
     }
 

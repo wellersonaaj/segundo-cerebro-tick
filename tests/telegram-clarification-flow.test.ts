@@ -30,6 +30,33 @@ describe('parse-clarification-answer', () => {
     expect(looksLikeClarificationAnswer('é Breno Moreira')).toBe(true);
     expect(looksLikeClarificationAnswer('O que eu tenho com o Breno?')).toBe(false);
   });
+
+  // Regression: case from Wellerson's prod logs (2026-06-06 ~13:10).
+  // Bot offered "1. Gabriella  2. Gabriel Guerra  3. Gabriel Xavier"
+  // and user replied with the literal text "Gabriel Xavier" instead
+  // of "3". Without this, the answer was treated as a new save and
+  // another clarification was raised over the same data.
+  it('looksLikeClarificationAnswer accepts literal text of an option (suggested answer match)', () => {
+    const options = [
+      'Gabriella de Amorim Assumpção',
+      'Gabriel Guerra',
+      'Gabriel Xavier',
+    ];
+    expect(looksLikeClarificationAnswer('Gabriel Xavier', options)).toBe(true);
+    expect(looksLikeClarificationAnswer('gabriel xavier', options)).toBe(true);
+    expect(looksLikeClarificationAnswer('Gabriella', options)).toBe(true);
+  });
+
+  it('looksLikeClarificationAnswer still rejects long free text when no suggestedAnswers provided', () => {
+    expect(looksLikeClarificationAnswer('Gabriel Xavier')).toBe(false);
+  });
+
+  it('looksLikeClarificationAnswer still rejects off-topic long text even with suggestedAnswers', () => {
+    const options = ['Gabriel Xavier', 'Gabriel Guerra'];
+    expect(looksLikeClarificationAnswer('Marquei de almoçar com o Breno hoje', options)).toBe(
+      false,
+    );
+  });
 });
 
 describe('format-clarification-prompt', () => {
