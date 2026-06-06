@@ -9,6 +9,7 @@ import type { CompactIngestionContext } from '../types/ingestion-context.js';
 import type { CompiledMemoryV2 } from '../types/memory-compiler-v2.js';
 import type { TemporalAnchor } from '../types/memory-compiler-v2.js';
 import { buildEffectiveInputWithSourceBlocks } from '../utils/source-blocks.js';
+import { log } from '../utils/logger.js';
 import {
   type FinalClarificationDecision,
   type ClarificationManagerV2Result,
@@ -23,6 +24,7 @@ import type { MemoryResolverResult } from './reference-resolver.service.js';
 import { TaskContextResolverService } from './task-context-resolver.service.js';
 import type { TaskSignalContextResolution } from '../types/ingestion-context.js';
 import { ThreadConversationContextService, prependThreadContextToEffectiveInput } from './thread-conversation-context.service.js';
+import { sanitizeV14EntityMentions } from './extraction-sanitizer-v14.service.js';
 import {
   applyImplicitAssigneeToOutput,
   suppressPronounClarifications,
@@ -104,6 +106,23 @@ export class ExtractorV14CompileService {
       timezone: inboxItem.timezone,
       context_block: options?.preContextBlock,
     });
+
+    // Sanitize entity_mentions: drop anything the LLM invented (not in the
+    // source) or that is a pronoun/stopword. Safety net for hallucination.
+    const sanitizeResult = sanitizeV14EntityMentions(
+      output,
+      inboxItem.raw_content,
+      options?.preContextBlock,
+    );
+    if (sanitizeResult.droppedMentions.length > 0) {
+      log('warn', 'extractor_v14', {
+        step: 'entity_mention_sanitized',
+        inbox_item_id: inboxItem.id,
+        dropped_count: sanitizeResult.droppedMentions.length,
+        dropped: sanitizeResult.droppedMentions.slice(0, 8),
+      });
+    }
+    output = sanitizeResult.output;
 
     output = applyImplicitAssigneeToOutput(output, sourceMode, inboxItem.raw_content);
     output = suppressStaleConfirmationContradictions(

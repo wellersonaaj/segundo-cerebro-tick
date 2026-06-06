@@ -103,6 +103,22 @@ export function composeFollowUpMessage(input: ComposeFollowUpInput): string {
     return lines.join('\n');
   }
 
+  // Honesty fallback: extraction ran but produced no tasks, no clarifications,
+  // no gaps, no enrichment. The LLM extracted *something* (events, entities,
+  // assertions) but nothing actionable surfaced. Tell the user plainly that
+  // we saved the raw note and ask for more context if they want structure.
+  const isEmpty =
+    input.tasks.length === 0 &&
+    input.clarifications.length === 0 &&
+    input.gaps.length === 0 &&
+    enrichmentFacts.length === 0;
+  if (isEmpty) {
+    lines.push('');
+    lines.push('Salvei a nota, mas não estruturei nada além (sem tarefa, sem entity óbvia).');
+    lines.push('Manda de novo com mais contexto se quiser tarefa/lembrete (ex: "criar tarefa ligar pra Breno amanhã").');
+    return lines.join('\n');
+  }
+
   lines.push('');
   lines.push('Tudo certo por aqui. Se quiser corrigir algo, responda nesta conversa ou envie uma nova mensagem.');
   return lines.join('\n');

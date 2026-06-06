@@ -84,7 +84,12 @@ describe('buildExtractorV14UserMessage with pre-context', () => {
 describe('ExtractorV14CompileService pre-context', () => {
   const inboxItem: InboxItem = {
     id: 'f0000000-0000-4000-8000-000000000099',
-    raw_content: 'reunião com Breno amanhã',
+    // raw_content must include all entity_mentions in the fixture so the
+    // anti-hallucination sanitizer doesn't drop them.
+    raw_content:
+      'Alex Costa (Ace) participou da reunião de integração do Projeto Atlas. ' +
+      'Dana Silva deve enviar o relatório Q2. ' +
+      '[CORREÇÃO] Na verdade, Bruno Vega participou.',
     source_channel: 'telegram',
     source_mode: 'conversational',
     received_at: '2026-06-05T10:00:00-03:00',
@@ -111,7 +116,7 @@ describe('ExtractorV14CompileService pre-context', () => {
     expect(extractV14).toHaveBeenCalledWith(
       expect.objectContaining({
         context_block: contextBlock,
-        effective_input: expect.stringContaining('reunião com Breno amanhã'),
+        effective_input: expect.stringContaining('Alex Costa'),
       }),
     );
   });

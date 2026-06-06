@@ -196,6 +196,29 @@ export class AssistantTurnService {
       const inboxItem = await this.resolveOrCreateInbox(turnId, input);
 
       if (inboxItem.duplicate_delivery) {
+        // Differentiate two cases:
+        // - source_reference duplicate: Telegram redelivered the same update.
+        //   Silent skip (the original is being processed).
+        // - content_duplicate: user sent the exact same text again within 24h.
+        //   Tell them so they know the system saw the message but didn't
+        //   re-extract (avoids silent 17× spam).
+        if (inboxItem.duplicate_reason === 'content') {
+          const dupInbox = await this.inboxRepo.findById(inboxItem.id);
+          const hoursAgo = dupInbox
+            ? (
+                (Date.now() -
+                  new Date(dupInbox.created_at ?? dupInbox.received_at).getTime()) /
+                (60 * 60 * 1000)
+              ).toFixed(1)
+            : '?';
+          const msg = `Você mandou essa mesma mensagem há ${hoursAgo}h. Não vou processar de novo pra não duplicar. Se quiser atualizar, manda uma correção (ex: "atualiza: ...").`;
+          setAssistantTurnStatus(turnId, 'completed', {
+            inbox_item_id: inboxItem.id,
+            follow_up_message: msg,
+          });
+          await input.delivery.sendFollowUp(msg);
+          return;
+        }
         log('info', 'assistant_turn', {
           step: 'duplicate_telegram_delivery_skipped',
           turn_id: turnId,
@@ -417,13 +440,17 @@ export class AssistantTurnService {
   private async resolveOrCreateInbox(
     turnId: string,
     input: StartCaptureInput,
-  ): Promise<{ id: string; duplicate_delivery?: boolean }> {
+  ): Promise<{ id: string; duplicate_delivery?: boolean; duplicate_reason?: 'telegram_redelivery' | 'content' }> {
     if (input.source_reference) {
       const existing = await this.inboxRepo.findBySourceReference(input.source_reference);
       if (existing) {
         const sameContent = existing.raw_content.trim() === input.text.trim();
         if (sameContent && existing.processing_status === 'completed') {
-          return { id: existing.id, duplicate_delivery: true };
+          return {
+            id: existing.id,
+            duplicate_delivery: true,
+            duplicate_reason: 'telegram_redelivery',
+          };
         }
         if (!sameContent) {
           log('warn', 'assistant_turn', {
@@ -434,6 +461,34 @@ export class AssistantTurnService {
         }
         return { id: existing.id };
       }
+    }
+
+    // Content-based dedup: if the user sent the EXACT same text recently,
+    // short-circuit before extraction. This prevents the 17-times-in-a-row
+    // spam from creating 17 phantom inboxes and 17× hallucinated entities.
+    // Window: 24h. If the user genuinely wants to re-mark the same thing,
+    // they can rephrase ("atualiza: ...") or use /nova:.
+    const DUPE_WINDOW_HOURS = 24;
+    const recentDupe = await this.inboxRepo.findRecentDuplicateContent(
+      input.text,
+      DUPE_WINDOW_HOURS,
+    );
+    if (recentDupe) {
+      const hoursAgo = (
+        (Date.now() - new Date(recentDupe.created_at ?? recentDupe.received_at).getTime()) /
+        (60 * 60 * 1000)
+      ).toFixed(1);
+      log('info', 'assistant_turn', {
+        step: 'content_duplicate_short_circuit',
+        turn_id: turnId,
+        duplicate_of_inbox_id: recentDupe.id,
+        hours_ago: hoursAgo,
+      });
+      return {
+        id: recentDupe.id,
+        duplicate_delivery: true,
+        duplicate_reason: 'content',
+      };
     }
 
     const metadata = withAssistantTurnMetadata(input.metadata ?? {}, {

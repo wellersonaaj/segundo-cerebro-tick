@@ -69,6 +69,32 @@ export class InboxItemsRepository {
     return data as InboxItemRow | null;
   }
 
+  /**
+   * Find a recent inbox with the exact same raw_content (trimmed).
+   * Used for content-based dedup: if the user sends the same message
+   * multiple times in a window, we short-circuit before extraction.
+   *
+   * Returns the MOST RECENT inbox with that content, or null.
+   */
+  async findRecentDuplicateContent(
+    rawContent: string,
+    windowHours: number,
+  ): Promise<InboxItemRow | null> {
+    const trimmed = rawContent.trim();
+    if (!trimmed) return null;
+    const since = new Date(Date.now() - windowHours * 60 * 60 * 1000).toISOString();
+    const { data, error } = await this.db
+      .from('inbox_items')
+      .select()
+      .eq('raw_content', trimmed)
+      .gte('created_at', since)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw new Error(`inbox_items.findRecentDuplicateContent: ${error.message}`);
+    return data as InboxItemRow | null;
+  }
+
   async listRecent(input: ListRecentInboxItemsInput = {}): Promise<InboxItemRow[]> {
     const limit = input.limit ?? 100;
     let q = this.db.from('inbox_items').select().order('received_at', { ascending: false });

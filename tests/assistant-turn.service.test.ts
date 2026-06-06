@@ -115,6 +115,7 @@ describe('AssistantTurnService correction mode', () => {
   it('capture mode creates inbox without correction service', async () => {
     const inboxRepo = {
       findBySourceReference: vi.fn(async () => null),
+      findRecentDuplicateContent: vi.fn(async () => null),
       create: vi.fn(async () => ({ id: 'new-inbox' })),
       findById: vi.fn(async () => ({
         id: 'new-inbox',
@@ -190,6 +191,7 @@ describe('AssistantTurnService pre-context', () => {
 
     const inboxRepo = {
       findBySourceReference: vi.fn(async () => null),
+      findRecentDuplicateContent: vi.fn(async () => null),
       create: vi.fn(async () => ({ id: 'new-inbox' })),
       findById: vi.fn(async () => null),
       updateMetadata: vi.fn(async () => {}),

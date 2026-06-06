@@ -29,6 +29,7 @@ function createMockDeps(overrides?: {
   return {
     inboxRepo: {
       findBySourceReference: vi.fn(async () => null as typeof inboxItem | null),
+      findRecentDuplicateContent: vi.fn(async () => null as typeof inboxItem | null),
       create: vi.fn(async () => inboxItem),
       findById: vi.fn(async () => inboxItem),
       updateMetadata: vi.fn(async () => {}),

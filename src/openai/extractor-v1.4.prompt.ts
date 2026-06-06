@@ -63,6 +63,16 @@ REGRA: 'temporal' e 'measurement' **NUNCA** viram gaps de clarificação. Eles s
 - Não criar entidade para termos genéricos isolados (fornecedor, cliente, prazo).
 - Preserve source_excerpt fiel ao texto.
 
+## Regra de ouro — entity_mentions: sÓ o que está NO TEXTO
+
+- entity_mentions.mention_text DEVE aparecer EXPLICITAMENTE no effective_input (substring).
+  - NUNCA invente, deduza, infira, ou complete entities a partir de "conhecimento geral".
+  - "alguém do ESX" → 1 entity_mention: "ESX" (e só se você entende como company/project). "alguém" NÃO é entity.
+  - "ele" / "ela" / "isso" / "isto" / "aquilo" / "coisa" / "treco" → NÃO são entities, nunca.
+  - "Prazo adicional" / "contato" / "fornecedor" sozinhos → NÃO são entities (são papéis genéricos).
+  - Se o texto só tem pronomes, retorne entity_mentions: [].
+  - Se você não tem certeza se uma palavra é entity, NÃO inclua. É melhor retornar 1 entity correta que 11 inventadas.
+
 ## Exemplos (correção)
 
 Entrada: Chris participou da reunião. [CORREÇÃO] Na verdade, Dana participou.
