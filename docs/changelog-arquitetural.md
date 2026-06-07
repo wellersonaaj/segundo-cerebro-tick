@@ -250,3 +250,41 @@ Registro de mudanças estruturais relevantes (não substitui commits git).
 
 - Aplicar migration 010 no Supabase.
 - Reset, reimportar `01-identidade-e-pessoas.md`, rodar `npm run test:bootstrap:smoke`.
+
+---
+
+## 2026-06-07 — Phase 5: Contextual Reasoner (scaffold + integração)
+
+Bug reports Wellerson 2026-06-07 (webchat):
+- **J1** — Prazo perguntado de novo em sub-task (msg 231 "Eu mesmo vou corrigir..." → bot perguntou "qual o prazo?" mas msg 228 já tinha "pretendo acabar hoje mesmo").
+- **J2** (corrigido Wellerson) — Evento "Estar no Rio pela Websummit" não era hallucination, user tinha sim mencionado.
+- **J3** — Clarif pile-up (msg 225 pediu 2 clarifs, msg 228 respondeu as 2, bot criou 3ª clarif em vez de resolver pendentes).
+
+**Solução:** Contextual Reasoner — LLM (gpt-4o-mini) que recebe mensagem atual + clarifs pendentes + thread context + tasks ativas, e decide:
+- `pure_reply` (resolve clarif, sem extração)
+- `new_capture` (extrai normalmente)
+- `mixed` (resolve clarif + extrai)
+- `update_existing` (atualiza task)
+- `cancel_pending` (cancela task)
+- `unrelated` (small talk, ignora)
+
+**Arquivos novos:**
+- `docs/plans/PHASE_5_REASONER.md` — design doc completo (TL;DR, arquitetura, JSON schema, few-shots, trade-offs, métricas, rollout)
+- `src/services/contextual-reasoner.types.ts` — ReasonInput/Output (Zod)
+- `src/services/contextual-reasoner.prompt.ts` — system prompt + 5 few-shots canônicos
+- `src/services/contextual-reasoner.service.ts` — LLM call + parse + sanity checks
+- `src/services/reasoner-context.builder.ts` — junta inbox/clarifs/thread num ReasonInput
+- `tests/contextual-reasoner.service.test.ts` — 14 unit tests (parse, fallback, sanity, error handling)
+- `tests/contextual-reasoner.eval.test.ts` — 10 cenários canônicos + sanity fallback (roda com `RUN_OPENAI_INTEGRATION_TESTS=true`)
+- `tests/helpers/reasoner-fixtures.ts` — fixtures
+
+**Modificados:**
+- `src/services/assistant-turn.service.ts` — novo stage ALS `reason` antes de `extraction`; constructor aceita `reasoner: ContextualReasonerService | null`
+- `src/app.ts` — wire condicional `env.OPENAI_API_KEY && env.REASONER_ENABLED ? createContextualReasonerService() : null`
+- `src/config/env.ts` — `REASONER_ENABLED` (default false) + `REASONER_MODEL` (default gpt-4o-mini)
+- `src/utils/structured-logger.ts` — novo LogStage `reason`
+- `.env.example` — documentação dos 2 flags novos
+
+**Status:** 5.1 entregue (scaffold + integração desabilitada por default). 5.2 (eval expandida) e 5.3 (rollout) são próximas sprints. **Não ligar em produção** sem rodar eval suite + 1 semana de shadow mode.
+
+**Testes:** 495/507 passam (11 skipped = eval live, 1 pré-existente idx_assertions). 14 tests novos do reasoner, todos verdes.

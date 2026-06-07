@@ -27,6 +27,15 @@ const envSchema = z.object({
     .optional()
     .transform((v) => v !== 'false'),
   INTENT_CLASSIFIER_MODEL: z.string().min(1).default('gpt-5-mini'),
+  // Phase 5 — Contextual Reasoner (roleta entre inbox e extraction)
+  // Default: false. Quando true, adiciona um LLM call (gpt-4o-mini) por save
+  // que decide o que fazer com a msg dado clarifs pendentes + thread + tasks.
+  // Resolved J1 (prazo repetido em sub-task) + J3 (clarif pile-up).
+  REASONER_ENABLED: z
+    .string()
+    .optional()
+    .transform((v) => v === 'true'),
+  REASONER_MODEL: z.string().min(1).default('gpt-4o-mini'),
   RAG_RETRIEVAL_TOP_K: z.coerce.number().int().positive().default(10),
   RAG_RERANK_KEEP_INBOX: z.coerce.number().int().positive().default(5),
   RAG_RERANK_KEEP_ASSERTIONS: z.coerce.number().int().positive().default(3),

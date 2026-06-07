@@ -39,6 +39,9 @@ import { formatRetrievalAsContextBlock } from './pre-context.service.js';
 import type { ThreadConversationContextService } from './thread-conversation-context.service.js';
 import { aggregateUncertaintyGaps, filterPersistableEphemeralGaps } from './uncertainty-aggregator.js';
 import { persistEphemeralUncertaintyGaps } from './assistant-ephemeral-clarifications.service.js';
+import type { ContextualReasonerService } from './contextual-reasoner.service.js';
+import type { ReasonInput, ReasonOutput } from './contextual-reasoner.types.js';
+import { buildReasonerContext } from './reasoner-context.builder.js';
 export class AssistantTurnService {
   constructor(
     private readonly inboxRepo: InboxItemsRepository,
@@ -50,6 +53,7 @@ export class AssistantTurnService {
     private readonly correctionService: CorrectionService | null = null,
     private readonly threadContextService: ThreadConversationContextService | null = null,
     private readonly retrieval: RetrievalService | null = null,
+    private readonly reasoner: ContextualReasonerService | null = null,
   ) {}
 
   async startCapture(input: StartCaptureInput): Promise<AssistantTurnAck> {
@@ -192,6 +196,7 @@ export class AssistantTurnService {
   }
 
   private async runCapturePipeline(turnId: string, input: StartCaptureInput): Promise<void> {
+    const threadId = input.thread_id;
     try {
       const inboxItem = await this.resolveOrCreateInbox(turnId, input);
 
@@ -232,6 +237,14 @@ export class AssistantTurnService {
       }
 
       const preContextBlock = await this.buildPreContextBlock(input.text);
+
+      // Phase 5: Contextual Reasoner (optional, REASONER_ENABLED=true)
+      // Runs BEFORE extraction to decide:
+      // - should we resolve pending clarifications?
+      // - is this a reply, new capture, mixed, update, or cancel?
+      // - what's the effective_input for v14?
+      // NOTE: na Fase 5.1 só loga. Fase 5.3 vai usar o output pra rotear.
+      const reasonOutput = await this.runReasonerStage(input, inboxItem.id, threadId, turnId);
 
       const alsTurn = getCurrentTurn();
       const processOptions: InboxItemProcessOptions | undefined = preContextBlock
@@ -407,6 +420,86 @@ export class AssistantTurnService {
           active_turn_id: null,
         }),
       );
+    }
+  }
+
+  /**
+   * Phase 5.1 — Contextual Reasoner stage.
+   * Retorna output ou null se desabilitado / erro.
+   * Por enquanto, só loga a decisão. Fase 5.3 vai usar pra rotear.
+   */
+  private async runReasonerStage(
+    input: StartCaptureInput,
+    inboxId: string,
+    threadId: string,
+    turnId: string,
+  ): Promise<ReasonOutput | null> {
+    if (!this.reasoner) {
+      return null;
+    }
+
+    const alsTurn = getCurrentTurn();
+    const runReason = async () => {
+      const answered = await this.clarificationsRepo.listAnsweredByInboxItem(inboxId);
+      const answeredSlices = answered.map((c) => ({
+        question: c.question,
+        answer: c.answer ?? '',
+        issue_type: c.issue_type ?? 'other',
+        target_reference: c.target_reference ?? '',
+      }));
+
+      const reasonInput = await buildReasonerContext({
+        inboxId,
+        threadId,
+        chatId:
+          input.channel === 'telegram' && typeof input.metadata?.chat_id === 'number'
+            ? (input.metadata.chat_id as number)
+            : null,
+        currentMessage: input.text,
+        channel: input.channel === 'telegram' ? 'telegram' : 'api',
+        receivedAt: input.received_at,
+        timezone: input.timezone,
+        inboxRepo: this.inboxRepo,
+        clarificationsRepo: this.clarificationsRepo,
+        threadContextService: this.threadContextService,
+        answeredSlices,
+      });
+
+      return this.reasoner!.reason(reasonInput);
+    };
+
+    try {
+      if (alsTurn) {
+        let result!: ReasonOutput | null;
+        await alsTurn.handle.stage('reason', async () => {
+          result = await runReason();
+          if (result) {
+            return {
+              output: {
+                decision: result.decision.kind,
+                confidence: result.decision.confidence,
+                reasoning: result.decision.reasoning,
+                n_resolutions: result.clarif_resolutions.length,
+                n_task_updates: result.task_updates.length,
+                has_new_capture: result.new_capture !== null,
+                n_new_clarifications: result.new_clarifications.length,
+              },
+            };
+          }
+          return { output: { skipped: 'no_reasoner' } };
+        });
+        return result ?? null;
+      }
+      return await runReason();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      log('warn', 'assistant_turn', {
+        step: 'reasoner_stage_failed',
+        turn_id: turnId,
+        inbox_id: inboxId,
+        error: message,
+      });
+      return null;
     }
   }
 

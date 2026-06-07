@@ -34,6 +34,7 @@ export type LogStage =
   | 'clarification_check'
   | 'intent_classify'
   | 'route_dispatch'
+  | 'reason'
   | 'retrieval'
   | 'retrieval_for_extraction'
   | 'rerank'

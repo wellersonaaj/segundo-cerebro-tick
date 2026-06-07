@@ -41,6 +41,7 @@ import { createRagPipeline, createRetrievalService } from './services/rag/create
 import { TelegramInboxService } from './services/telegram-inbox.service.js';
 import { ThreadConversationContextService } from './services/thread-conversation-context.service.js';
 import { UnifiedRouterService } from './services/unified-router.service.js';
+import { createContextualReasonerService } from './services/contextual-reasoner.service.js';
 
 export interface AppDeps {
   inboxItemProcess?: InboxItemProcessService;
@@ -87,6 +88,9 @@ export async function buildApp(deps: AppDeps = {}) {
       corrections,
       threadContextService,
       retrieval,
+      env.OPENAI_API_KEY && env.REASONER_ENABLED
+        ? createContextualReasonerService()
+        : null,
     );
 
   const intentClassifier =
