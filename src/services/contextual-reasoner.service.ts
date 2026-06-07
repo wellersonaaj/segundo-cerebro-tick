@@ -273,14 +273,20 @@ export class ContextualReasonerService {
       return SAFE_FALLBACK;
     }
 
-    // 2. Se não há contexto nenhum (sem clarifs, sem thread, sem tasks)
-    //    E a msg é trivial, retorna unrelated direto sem gastar LLM call
-    const isTrivial = input.currentMessage.trim().length < 5;
+    // 2. Heurística de skip: se msg é trivial (curta) e não há contexto
+    //    (sem clarifs, sem thread, sem tasks ativas), retorna unrelated
+    //    direto sem gastar LLM call. Economiza ~$0.0005/save + ~3.5s.
+    const isTrivial = input.currentMessage.trim().length < 12;
     const hasContext =
       input.pendingClarifications.length > 0 ||
       input.threadContext.recentMessages.length > 0 ||
       input.activeTasks.length > 0;
     if (isTrivial && !hasContext) {
+      log('info', 'contextual_reasoner', {
+        step: 'skipped_trivial',
+        reason: 'msg_curta_sem_contexto',
+        message_length: input.currentMessage.trim().length,
+      });
       return {
         decision: {
           kind: 'unrelated',

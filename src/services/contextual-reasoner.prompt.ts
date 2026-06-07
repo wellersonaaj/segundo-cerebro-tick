@@ -5,7 +5,7 @@ import type { ReasonInput } from './contextual-reasoner.types.js';
  * Bump PROMPT_VERSION quando few-shots ou regras mudarem.
  */
 export const REASONER_VERSION = 'contextual-reasoner-v1.0';
-export const REASONER_PROMPT_VERSION = 'contextual-reasoner-v1.0.0';
+export const REASONER_PROMPT_VERSION = 'contextual-reasoner-v1.0.1';
 export const REASONER_SCHEMA_VERSION = '1.0';
 
 /**
@@ -165,6 +165,91 @@ Output esperado:
   "clarif_resolutions": [],
   "task_updates": [],
   "new_capture": null,
+  "new_clarifications": []
+}
+
+### Few-shot 6: update_existing (mudou prazo)
+
+Input:
+- currentMessage: "na verdade o prazo das correções do Miranda é amanhã, não hoje"
+- pendingClarifications: []
+- threadContext.recentMessages: [{ inbox_item_id: "inb_msg228", raw_content: "Sobre corrigir os pontos do projeto Miranda, pretendo acabar hoje mesmo.", created_at: "2026-06-07T10:54:00Z" }]
+- activeTasks: [{ id: "task_abc", title: "Corrigir os pontos do projeto Miranda", status: "open", due_at: "2026-06-07", inbox_item_id: "inb_msg228", created_at: "2026-06-07T10:54:00Z" }]
+
+Output esperado:
+{
+  "decision": { "kind": "update_existing", "confidence": 0.93, "reasoning": "User atualizou prazo da task ativa 'Corrigir Miranda' de hoje para amanhã." },
+  "clarif_resolutions": [],
+  "task_updates": [{ "task_id": "task_abc", "operation": "update_due_date", "new_value": "amanhã (2026-06-08)", "inherit_from_parent": false, "parent_task_id": null, "reasoning": "User disse 'é amanhã, não hoje'." }],
+  "new_capture": { "effective_input": "Atualização: prazo das correções do projeto Miranda mudou de hoje para amanhã.", "summary": "Atualiza prazo de task ativa." },
+  "new_clarifications": []
+}
+
+### Few-shot 7: mixed (resolve clarif + novo entity)
+
+Input:
+- currentMessage: "Gabriel Xavier, pode adicionar ele na lista. Ele é meu primo."
+- pendingClarifications: [{ id: "clf_gabriel", question: "Quem é Gabriel Xavier?", issue_type: "ambiguous_identity", target_reference: "Gabriel Xavier", inbox_item_id: "inb_gabriel" }]
+- threadContext.recentMessages: [{ inbox_item_id: "inb_gabriel", raw_content: "Conversei com o Gabriel Xavier ontem.", created_at: "2026-06-07T10:00:00Z" }]
+- activeTasks: []
+
+Output esperado:
+{
+  "decision": { "kind": "mixed", "confidence": 0.94, "reasoning": "Responde clarif 'Quem é Gabriel Xavier' + adiciona info nova (primo)." },
+  "clarif_resolutions": [{ "clarification_id": "clf_gabriel", "answered": true, "answer": "Primo do Wellerson", "confidence": 0.95 }],
+  "task_updates": [],
+  "new_capture": { "effective_input": "Gabriel Xavier é primo do Wellerson. Conversaram ontem.", "summary": "Responde clarif + captura relação familiar." },
+  "new_clarifications": []
+}
+
+### Few-shot 8: complex capture (sem contexto prévio)
+
+Input:
+- currentMessage: "Reunião com Breno e Lari amanhã 14h no escritório da Brant. Discutir roadmap Q3."
+- pendingClarifications: []
+- threadContext.recentMessages: []
+- activeTasks: []
+
+Output esperado:
+{
+  "decision": { "kind": "new_capture", "confidence": 0.97, "reasoning": "Compromisso novo com data e participantes claros. Sem clarifs/tasks pendentes." },
+  "clarif_resolutions": [],
+  "task_updates": [],
+  "new_capture": { "effective_input": "Reunião com Breno e Lari amanhã 14h no escritório da Brant. Discutir roadmap Q3.", "summary": "Compromisso: reunião Q3 com Breno+Lari na Brant." },
+  "new_clarifications": []
+}
+
+### Few-shot 9: msg irrelevante com clarif pendente (NÃO responde)
+
+Input:
+- currentMessage: "gastei 50 reais no almoço"
+- pendingClarifications: [{ id: "clf_breno", question: "Quem é o Breno?", issue_type: "ambiguous_identity", target_reference: "Breno", inbox_item_id: "inb_breno" }]
+- threadContext.recentMessages: []
+- activeTasks: []
+
+Output esperado:
+{
+  "decision": { "kind": "new_capture", "confidence": 0.92, "reasoning": "Msg é sobre gasto, não responde clarif sobre identidade do Breno." },
+  "clarif_resolutions": [],
+  "task_updates": [],
+  "new_capture": { "effective_input": "gastei 50 reais no almoço", "summary": "Gasto: R$ 50 no almoço." },
+  "new_clarifications": []
+}
+
+### Few-shot 10: thread continuation (atualiza task existente)
+
+Input:
+- currentMessage: "combinei com o Breno, vai ser quinta às 15h"
+- pendingClarifications: []
+- threadContext.recentMessages: [{ inbox_item_id: "inb_reuniao", raw_content: "preciso marcar reunião com o Breno", created_at: "2026-06-06T10:00:00Z" }]
+- activeTasks: [{ id: "task_xyz", title: "Reunião com Breno", status: "open", due_at: null, inbox_item_id: "inb_reuniao", created_at: "2026-06-06T10:00:00Z" }]
+
+Output esperado:
+{
+  "decision": { "kind": "update_existing", "confidence": 0.91, "reasoning": "User definiu data+hora da reunião com Breno (task ativa)." },
+  "clarif_resolutions": [],
+  "task_updates": [{ "task_id": "task_xyz", "operation": "update_due_date", "new_value": "quinta às 15h", "inherit_from_parent": false, "parent_task_id": null, "reasoning": "User disse 'quinta às 15h'." }],
+  "new_capture": { "effective_input": "Atualização: reunião com Breno marcada para quinta às 15h.", "summary": "Define data/hora de task ativa." },
   "new_clarifications": []
 }
 

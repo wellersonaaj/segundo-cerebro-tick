@@ -12,6 +12,7 @@ import {
 } from '../telegram/telegram-metadata.js';
 import { log } from '../utils/logger.js';
 import { getCurrentTurn } from '../utils/turn-context.js';
+import { loadEnv } from '../config/env.js';
 import {
   composeAssistantAck,
   composeClarificationAck,
@@ -42,6 +43,7 @@ import { persistEphemeralUncertaintyGaps } from './assistant-ephemeral-clarifica
 import type { ContextualReasonerService } from './contextual-reasoner.service.js';
 import type { ReasonInput, ReasonOutput } from './contextual-reasoner.types.js';
 import { buildReasonerContext } from './reasoner-context.builder.js';
+import { ContextualReasonerDispatcher } from './contextual-reasoner-dispatcher.service.js';
 import type { TasksRepository } from '../repositories/tasks.repository.js';
 export class AssistantTurnService {
   constructor(
@@ -426,22 +428,23 @@ export class AssistantTurnService {
   }
 
   /**
-   * Phase 5.1 — Contextual Reasoner stage.
+   * Phase 5.1 + 5.3 — Contextual Reasoner stage + dispatcher.
    * Retorna output ou null se desabilitado / erro.
-   * Por enquanto, só loga a decisão. Fase 5.3 vai usar pra rotear.
+   * Em act mode: o dispatcher AGE na decisão (resolve clarifs, roda extraction).
+   * Em shadow mode: loga TUDO mas não age.
    */
   private async runReasonerStage(
     input: StartCaptureInput,
     inboxId: string,
     threadId: string,
     turnId: string,
-  ): Promise<ReasonOutput | null> {
+  ): Promise<{ output: ReasonOutput; input: ReasonInput; dispatcherResult?: Awaited<ReturnType<ContextualReasonerDispatcher['dispatch']>> } | null> {
     if (!this.reasoner) {
       return null;
     }
 
     const alsTurn = getCurrentTurn();
-    const runReason = async () => {
+    const runReasonAndDispatch = async () => {
       const answered = await this.clarificationsRepo.listAnsweredByInboxItem(inboxId);
       const answeredSlices = answered.map((c) => ({
         question: c.question,
@@ -468,24 +471,48 @@ export class AssistantTurnService {
         answeredSlices,
       });
 
-      return this.reasoner!.reason(reasonInput);
+      const output = await this.reasoner!.reason(reasonInput);
+
+      // 5.3 — Dispatcher age na decisão
+      const env = loadEnv();
+      const mode = env.REASONER_MODE;
+      const dispatcher = new ContextualReasonerDispatcher({
+        clarificationService: this.clarificationService,
+        clarificationsRepo: this.clarificationsRepo,
+        inboxRepo: this.inboxRepo,
+        tasksRepo: this.tasksRepo,
+        v14Process: this.v14Process,
+      });
+      const dispatcherResult = await dispatcher.dispatch({
+        inboxId,
+        reasonOutput: output,
+        reasonInput,
+        mode,
+      });
+
+      return { output, input: reasonInput, dispatcherResult };
     };
 
     try {
       if (alsTurn) {
-        let result!: ReasonOutput | null;
+        let result!: Awaited<ReturnType<typeof runReasonAndDispatch>> | null;
         await alsTurn.handle.stage('reason', async () => {
-          result = await runReason();
+          result = await runReasonAndDispatch();
           if (result) {
             return {
               output: {
-                decision: result.decision.kind,
-                confidence: result.decision.confidence,
-                reasoning: result.decision.reasoning,
-                n_resolutions: result.clarif_resolutions.length,
-                n_task_updates: result.task_updates.length,
-                has_new_capture: result.new_capture !== null,
-                n_new_clarifications: result.new_clarifications.length,
+                decision: result.output.decision.kind,
+                confidence: result.output.decision.confidence,
+                reasoning: result.output.decision.reasoning,
+                n_resolutions: result.output.clarif_resolutions.length,
+                n_task_updates: result.output.task_updates.length,
+                has_new_capture: result.output.new_capture !== null,
+                n_new_clarifications: result.output.new_clarifications.length,
+                dispatcher_clarifs_resolved: result.dispatcherResult?.clarifsResolved ?? 0,
+                dispatcher_extraction_ran: result.dispatcherResult?.extractionRan ?? false,
+                dispatcher_awaiting_confirmation:
+                  result.dispatcherResult?.awaitingConfirmation ?? false,
+                dispatcher_mode: loadEnv().REASONER_MODE,
               },
             };
           }
@@ -493,7 +520,7 @@ export class AssistantTurnService {
         });
         return result ?? null;
       }
-      return await runReason();
+      return await runReasonAndDispatch();
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       log('warn', 'assistant_turn', {

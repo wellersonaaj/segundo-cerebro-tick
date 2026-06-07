@@ -6,7 +6,7 @@ const envSchema = z.object({
   SUPABASE_URL: z.string().url(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
   OPENAI_API_KEY: z.string().min(1).optional(),
-  OPENAI_MODEL: z.string().default('gpt-5-mini'),
+  OPENAI_MODEL: z.string().default('gpt-4o-mini'),
   MCP_TRANSPORT: z.enum(['stdio']).default('stdio'),
   RUN_OPENAI_INTEGRATION_TESTS: z
     .string()
@@ -36,6 +36,11 @@ const envSchema = z.object({
     .optional()
     .transform((v) => v === 'true'),
   REASONER_MODEL: z.string().min(1).default('gpt-4o-mini'),
+  // Phase 5.3 — Modo do Reasoner
+  // shadow: roda, decide, loga, mas o dispatcher NÃO age. Pipeline segue igual.
+  // act:    o dispatcher age na decisão (resolve clarifs, atualiza task, etc).
+  // Default 'act' para o primeiro deploy. Pode flipar pra 'shadow' se der ruim.
+  REASONER_MODE: z.enum(['shadow', 'act']).default('act'),
   RAG_RETRIEVAL_TOP_K: z.coerce.number().int().positive().default(10),
   RAG_RERANK_KEEP_INBOX: z.coerce.number().int().positive().default(5),
   RAG_RERANK_KEEP_ASSERTIONS: z.coerce.number().int().positive().default(3),
