@@ -13,22 +13,22 @@
 * **Aliases frequentes:** Wellerson, Tick
 * **Papel profissional:** Cofundador e CPTO da VELT
 * **Áreas recorrentes de atuação:** produto, tecnologia, arquitetura de sistemas, automações e aplicação de IA em negócios
-* **Contexto pessoal relevante:** vive um relacionamento aberto
+* **Contexto pessoal relevante:** vive um relacionamento com a Lari (Larisse)
 
 ---
 
 # 2. Núcleo familiar
 
-## Wellerson Alves de Assumpção
+## Pai
 
 * **Relação com Wellerson:** pai
 * **Cônjuge:** Maria das Graças de Amorim Assumpção
 * **Localidade de referência:** Contagem, Minas Gerais
 
-## Maria das Graças de Amorim Assumpção
+## Mãe
 
 * **Relação com Wellerson:** mãe
-* **Cônjuge:** Wellerson Alves de Assumpção
+* **Cônjuge:** Wellerson Alves de Assumpção (sim, mesmo nome que o meu, mas tenho Junior no final)
 * **Localidade de referência:** Contagem, Minas Gerais
 
 ## Marcella de Amorim Assumpção
