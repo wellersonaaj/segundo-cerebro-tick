@@ -80,14 +80,14 @@ describeIf('Contextual Reasoner — eval suite (LLM real)', () => {
             target_reference: 'responsável',
             suggested_answers: ['Eu (você)', 'Cátia', 'Outra pessoa'],
             source_excerpt: 'preciso lembrar de corrigir os pontos levantados pela Cátia',
-            inbox_item_id: 'inb_msg225',
+            inbox_item_id: '55555555-5555-4555-8555-555555555555',
           },
         ],
         threadContext: {
           thread_id: 'telegram:5991664193',
           recentMessages: [
             {
-              inbox_item_id: 'inb_msg228',
+              inbox_item_id: '66666666-6666-4666-8666-666666666666',
               raw_content:
                 'Websummit começa amanhã, dia 08 de junho e termina dia 11. Sobre corrigir os pontos do projeto Miranda, pretendo acabar hoje mesmo.',
               created_at: '2026-06-07T10:54:00Z',
@@ -106,7 +106,7 @@ describeIf('Contextual Reasoner — eval suite (LLM real)', () => {
             due_at: '2026-06-07',
             assignee_reference: null,
             project_reference: 'Miranda',
-            inbox_item_id: 'inb_msg228',
+            inbox_item_id: '66666666-6666-4666-8666-666666666666',
             created_at: '2026-06-07T10:54:00Z',
           },
         ],
@@ -138,7 +138,7 @@ describeIf('Contextual Reasoner — eval suite (LLM real)', () => {
             target_reference: 'Estar no Rio pela Websummit',
             suggested_answers: [],
             source_excerpt: 'estará no Rio essa semana pela liquid assim como eu estarei pela velt',
-            inbox_item_id: 'inb_msg225',
+            inbox_item_id: '55555555-5555-4555-8555-555555555555',
           },
           {
             id: 'clf_miranda',
@@ -147,14 +147,14 @@ describeIf('Contextual Reasoner — eval suite (LLM real)', () => {
             target_reference: 'Corrigir os pontos do projeto Miranda',
             suggested_answers: [],
             source_excerpt: 'preciso lembrar de corrigir os pontos levantados pela Cátia',
-            inbox_item_id: 'inb_msg225',
+            inbox_item_id: '55555555-5555-4555-8555-555555555555',
           },
         ],
         threadContext: {
           thread_id: 'telegram:5991664193',
           recentMessages: [
             {
-              inbox_item_id: 'inb_msg225',
+              inbox_item_id: '55555555-5555-4555-8555-555555555555',
               raw_content:
                 'Ok. Preciso lembrar de corrigir os pontos levantados pela Cátia com relação ao projeto Miranda. O projeto Miranda é um app de gestão para brechós...',
               created_at: '2026-06-07T10:51:00Z',
@@ -174,7 +174,7 @@ describeIf('Contextual Reasoner — eval suite (LLM real)', () => {
             due_at: null,
             assignee_reference: null,
             project_reference: 'Miranda',
-            inbox_item_id: 'inb_msg225',
+            inbox_item_id: '55555555-5555-4555-8555-555555555555',
             created_at: '2026-06-07T10:51:00Z',
           },
         ],
@@ -202,7 +202,7 @@ describeIf('Contextual Reasoner — eval suite (LLM real)', () => {
             due_at: null,
             assignee_reference: null,
             project_reference: null,
-            inbox_item_id: 'inb_old',
+            inbox_item_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
             created_at: '2026-06-01T10:00:00Z',
           },
         ],
@@ -224,7 +224,7 @@ describeIf('Contextual Reasoner — eval suite (LLM real)', () => {
           thread_id: 'telegram:5991664193',
           recentMessages: [
             {
-              inbox_item_id: 'inb_msg228',
+              inbox_item_id: '66666666-6666-4666-8666-666666666666',
               raw_content:
                 'Sobre corrigir os pontos do projeto Miranda, pretendo acabar hoje mesmo.',
               created_at: '2026-06-07T10:54:00Z',
@@ -240,7 +240,7 @@ describeIf('Contextual Reasoner — eval suite (LLM real)', () => {
             due_at: '2026-06-07',
             assignee_reference: 'Wellerson',
             project_reference: 'Miranda',
-            inbox_item_id: 'inb_msg228',
+            inbox_item_id: '66666666-6666-4666-8666-666666666666',
             created_at: '2026-06-07T10:54:00Z',
           },
         ],
@@ -265,7 +265,7 @@ describeIf('Contextual Reasoner — eval suite (LLM real)', () => {
             target_reference: 'Gabriel Xavier',
             suggested_answers: [],
             source_excerpt: 'Conversei com o Gabriel Xavier ontem',
-            inbox_item_id: 'inb_gabriel',
+            inbox_item_id: '77777777-7777-4777-8777-777777777777',
           },
         ],
       }),
@@ -303,7 +303,7 @@ describeIf('Contextual Reasoner — eval suite (LLM real)', () => {
             target_reference: 'Breno',
             suggested_answers: [],
             source_excerpt: 'reunião com Breno',
-            inbox_item_id: 'inb_breno',
+            inbox_item_id: '88888888-8888-4888-8888-888888888888',
           },
         ],
       }),
@@ -327,7 +327,7 @@ describeIf('Contextual Reasoner — eval suite (LLM real)', () => {
             due_at: null,
             assignee_reference: 'Wellerson',
             project_reference: null,
-            inbox_item_id: 'inb_reuniao',
+            inbox_item_id: '99999999-9999-4999-8999-999999999999',
             created_at: '2026-06-06T10:00:00Z',
           },
         ],

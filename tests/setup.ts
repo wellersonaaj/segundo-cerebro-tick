@@ -6,7 +6,10 @@ process.env.SUPABASE_SERVICE_ROLE_KEY =
 process.env.OPENAI_API_KEY = process.env.OPENAI_API_KEY ?? 'test-openai-key';
 process.env.OPENAI_MODEL = 'gpt-5-mini';
 process.env.MCP_TRANSPORT = 'stdio';
-process.env.RUN_OPENAI_INTEGRATION_TESTS = 'false';
+// NOTA: NÃO forçar RUN_OPENAI_INTEGRATION_TESTS=false aqui —
+// testes que precisam de LLM real (ex: contextual-reasoner.eval) usam
+// describeIf(isOpenAiIntegrationEnabled()) e devem respeitar a flag
+// passada via CLI/shell. Default = false (testes LLM são skip).
 
 import { resetEnvCache } from '../src/config/env.js';
 import { resetSupabaseClient } from '../src/db/supabase.js';

@@ -297,6 +297,7 @@ export class ContextualReasonerService {
     // 3. Chamar LLM
     const userMessage = buildReasonerUserMessage(inputParsed.data);
     let llmResult: ReasonerLlmResult;
+    const llmStart = Date.now();
     try {
       llmResult = await this.llm.completeJson({
         model: this.model,
@@ -310,9 +311,11 @@ export class ContextualReasonerService {
       log('error', 'contextual_reasoner', {
         step: 'llm_error',
         error: message,
+        latency_ms: Date.now() - llmStart,
       });
       return SAFE_FALLBACK;
     }
+    const llmLatencyMs = Date.now() - llmStart;
 
     // 4. Parse
     const parsed = parseReasonerLlmResponse(llmResult.content);
@@ -324,6 +327,7 @@ export class ContextualReasonerService {
         model: llmResult.model,
         input_tokens: llmResult.input_tokens,
         output_tokens: llmResult.output_tokens,
+        latency_ms: llmLatencyMs,
       });
       return SAFE_FALLBACK;
     }
@@ -344,6 +348,7 @@ export class ContextualReasonerService {
       model: llmResult.model,
       input_tokens: llmResult.input_tokens,
       output_tokens: llmResult.output_tokens,
+      latency_ms: llmLatencyMs,
       finish_reason: llmResult.finish_reason,
     });
 
