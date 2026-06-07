@@ -20,6 +20,11 @@ const describeIf = ENABLED ? describe : describe.skip;
 
 const svc = ENABLED ? createContextualReasonerService() : null;
 
+// Timeout pra testes LLM-dependent: default vitest é 5s, mas C4 (resolve 2
+// clarifs + new capture com thread context completo) demora ~5.3s no gpt-4o-mini.
+// 30s dá headroom generoso sem mascarar timeouts reais.
+const LLM_TEST_TIMEOUT = 30_000;
+
 function makeInput(partial: Partial<ReasonInput> = {}): ReasonInput {
   return {
     currentMessage: 'oi',
@@ -45,7 +50,7 @@ describeIf('Contextual Reasoner — eval suite (LLM real)', () => {
   // --------------------------------------------------------------------------
   // C1: pure new capture (sem clarifs/tasks) — Few-shot 3
   // --------------------------------------------------------------------------
-  it('C1: pure new capture', async () => {
+  it('C1: pure new capture', { timeout: LLM_TEST_TIMEOUT }, async () => {
     const out = await svc!.reason(
       makeInput({ currentMessage: 'ideia: app de pomodoro com integração ao notion' }),
     );
@@ -58,7 +63,7 @@ describeIf('Contextual Reasoner — eval suite (LLM real)', () => {
   // --------------------------------------------------------------------------
   // C2: unrelated (small talk)
   // --------------------------------------------------------------------------
-  it('C2: unrelated (small talk)', async () => {
+  it('C2: unrelated (small talk)', { timeout: LLM_TEST_TIMEOUT }, async () => {
     const out = await svc!.reason(makeInput({ currentMessage: 'oi' }));
     expect(out.decision.kind).toBe('unrelated');
     expect(out.new_capture).toBeNull();
@@ -67,7 +72,7 @@ describeIf('Contextual Reasoner — eval suite (LLM real)', () => {
   // --------------------------------------------------------------------------
   // C3: J1 — sub-task herda prazo do pai (bug que motivou Fase 5)
   // --------------------------------------------------------------------------
-  it('C3: J1 — sub-task herda prazo do pai (prazo repetido)', async () => {
+  it('C3: J1 — sub-task herda prazo do pai (prazo repetido)', { timeout: LLM_TEST_TIMEOUT }, async () => {
     const out = await svc!.reason(
       makeInput({
         currentMessage:
@@ -125,7 +130,7 @@ describeIf('Contextual Reasoner — eval suite (LLM real)', () => {
   // --------------------------------------------------------------------------
   // C4: J3 — responde 2 clarifs de uma vez (bug que motivou Fase 5)
   // --------------------------------------------------------------------------
-  it('C4: J3 — responde 2 clarifs de uma vez', async () => {
+  it('C4: J3 — responde 2 clarifs de uma vez', { timeout: LLM_TEST_TIMEOUT }, async () => {
     const out = await svc!.reason(
       makeInput({
         currentMessage:
@@ -190,7 +195,7 @@ describeIf('Contextual Reasoner — eval suite (LLM real)', () => {
   // --------------------------------------------------------------------------
   // C5: cancel (Few-shot 4)
   // --------------------------------------------------------------------------
-  it('C5: cancel de task ativa', async () => {
+  it('C5: cancel de task ativa', { timeout: LLM_TEST_TIMEOUT }, async () => {
     const out = await svc!.reason(
       makeInput({
         currentMessage: 'esquece, desisti do app de pomodoro',
@@ -216,7 +221,7 @@ describeIf('Contextual Reasoner — eval suite (LLM real)', () => {
   // --------------------------------------------------------------------------
   // C6: update_existing — "na verdade o prazo é amanhã" (sobrescreve)
   // --------------------------------------------------------------------------
-  it('C6: update existing task (mudou prazo)', async () => {
+  it('C6: update existing task (mudou prazo)', { timeout: LLM_TEST_TIMEOUT }, async () => {
     const out = await svc!.reason(
       makeInput({
         currentMessage: 'na verdade o prazo das correções do Miranda é amanhã, não hoje',
@@ -253,7 +258,7 @@ describeIf('Contextual Reasoner — eval suite (LLM real)', () => {
   // --------------------------------------------------------------------------
   // C7: mixed — resolve clarif + adiciona conteúdo novo
   // --------------------------------------------------------------------------
-  it('C7: mixed — resolve clarif + novo entity', async () => {
+  it('C7: mixed — resolve clarif + novo entity', { timeout: LLM_TEST_TIMEOUT }, async () => {
     const out = await svc!.reason(
       makeInput({
         currentMessage: 'Gabriel Xavier, pode adicionar ele na lista. Ele é meu primo.',
@@ -278,7 +283,7 @@ describeIf('Contextual Reasoner — eval suite (LLM real)', () => {
   // --------------------------------------------------------------------------
   // C8: sem clarifs + sem contexto + msg complexa = new_capture
   // --------------------------------------------------------------------------
-  it('C8: msg complexa sem contexto', async () => {
+  it('C8: msg complexa sem contexto', { timeout: LLM_TEST_TIMEOUT }, async () => {
     const out = await svc!.reason(
       makeInput({
         currentMessage:
@@ -291,7 +296,7 @@ describeIf('Contextual Reasoner — eval suite (LLM real)', () => {
   // --------------------------------------------------------------------------
   // C9: pending clarif + msg que NÃO responde (irrelevante)
   // --------------------------------------------------------------------------
-  it('C9: msg irrelevante não deve "responder" clarif pendente', async () => {
+  it('C9: msg irrelevante não deve "responder" clarif pendente', { timeout: LLM_TEST_TIMEOUT }, async () => {
     const out = await svc!.reason(
       makeInput({
         currentMessage: 'gastei 50 reais no almoço',
@@ -315,7 +320,7 @@ describeIf('Contextual Reasoner — eval suite (LLM real)', () => {
   // --------------------------------------------------------------------------
   // C10: thread continuation (sem clarif, mas task ativa relacionada)
   // --------------------------------------------------------------------------
-  it('C10: thread continuation — msg adiciona info a task ativa', async () => {
+  it('C10: thread continuation — msg adiciona info a task ativa', { timeout: LLM_TEST_TIMEOUT }, async () => {
     const out = await svc!.reason(
       makeInput({
         currentMessage: 'combinei com o Breno, vai ser quinta às 15h',
