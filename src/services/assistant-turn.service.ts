@@ -42,6 +42,7 @@ import { persistEphemeralUncertaintyGaps } from './assistant-ephemeral-clarifica
 import type { ContextualReasonerService } from './contextual-reasoner.service.js';
 import type { ReasonInput, ReasonOutput } from './contextual-reasoner.types.js';
 import { buildReasonerContext } from './reasoner-context.builder.js';
+import type { TasksRepository } from '../repositories/tasks.repository.js';
 export class AssistantTurnService {
   constructor(
     private readonly inboxRepo: InboxItemsRepository,
@@ -54,6 +55,7 @@ export class AssistantTurnService {
     private readonly threadContextService: ThreadConversationContextService | null = null,
     private readonly retrieval: RetrievalService | null = null,
     private readonly reasoner: ContextualReasonerService | null = null,
+    private readonly tasksRepo: TasksRepository | null = null,
   ) {}
 
   async startCapture(input: StartCaptureInput): Promise<AssistantTurnAck> {
@@ -461,6 +463,7 @@ export class AssistantTurnService {
         timezone: input.timezone,
         inboxRepo: this.inboxRepo,
         clarificationsRepo: this.clarificationsRepo,
+        tasksRepo: this.tasksRepo,
         threadContextService: this.threadContextService,
         answeredSlices,
       });

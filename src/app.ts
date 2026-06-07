@@ -91,6 +91,7 @@ export async function buildApp(deps: AppDeps = {}) {
       env.OPENAI_API_KEY && env.REASONER_ENABLED
         ? createContextualReasonerService()
         : null,
+      tasksRepo,
     );
 
   const intentClassifier =

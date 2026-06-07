@@ -130,6 +130,46 @@ export class TasksRepository {
     return this.list('open', query, limit);
   }
 
+  /**
+   * Lista tasks ativas (open/blocked) que têm mutação em algum dos
+   * inbox_items fornecidos. Usado pelo Contextual Reasoner pra
+   * montar o activeTasks do ReasonInput (decisão update_existing).
+   *
+   * Greenfield: tasks não tem inbox_item_id direto — vem de task_mutations.
+   * A query faz o JOIN e dedupa por task_id.
+   */
+  async listActiveByInboxItemIds(
+    inboxItemIds: string[],
+    limit = 20,
+  ): Promise<Task[]> {
+    if (!inboxItemIds.length) return [];
+    const { data: mutations, error: mutErr } = await this.db
+      .from('task_mutations')
+      .select('task_id')
+      .in('inbox_item_id', inboxItemIds)
+      .eq('record_status', 'active');
+    if (mutErr) {
+      throw new Error(`tasks.listActiveByInboxItemIds: ${mutErr.message}`);
+    }
+    const taskIds = Array.from(
+      new Set((mutations ?? []).map((m) => m.task_id as string).filter(Boolean)),
+    );
+    if (!taskIds.length) return [];
+
+    const { data, error } = await this.db
+      .from('tasks')
+      .select()
+      .in('id', taskIds)
+      .in('status', ['open', 'blocked'])
+      .order('updated_at', { ascending: false })
+      .limit(limit);
+    if (error) {
+      throw new Error(`tasks.listActiveByInboxItemIds: ${error.message}`);
+    }
+    const tasks = (data ?? []).map((row) => mapTaskRow(row as Record<string, unknown>));
+    return this.enrichTaskLineage(tasks);
+  }
+
   async supersedeByInboxItem(inboxItemId: string, correctionId: string): Promise<void> {
     const { error } = await this.db
       .from('tasks')

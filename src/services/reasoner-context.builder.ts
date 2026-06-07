@@ -17,7 +17,7 @@ import { log } from '../utils/logger.js';
  * Fontes:
  * 1. Clarifs pendentes do chat (todas as threads ativas, filtradas por isTelegramPromptable)
  * 2. Thread context (últimas 3 msgs do mesmo thread + entities salientes)
- * 3. Tasks ativas (open/in_progress) — opcional, Fase 5.2 pode injetar
+ * 3. Tasks ativas (open/blocked) dos inboxes do thread — via task_mutations JOIN
  */
 export async function buildReasonerContext(params: {
   inboxId: string;
@@ -29,6 +29,7 @@ export async function buildReasonerContext(params: {
   timezone: string;
   inboxRepo: InboxItemsRepository;
   clarificationsRepo: ClarificationsRepository;
+  tasksRepo: TasksRepository | null;
   threadContextService: ThreadConversationContextService | null;
   answeredSlices: Array<{
     question: string;
@@ -43,9 +44,13 @@ export async function buildReasonerContext(params: {
   // 2. Thread context (últimas 3 msgs + entities)
   const threadContext: ThreadContext = await buildThreadContext(params);
 
-  // 3. Active tasks — best-effort. Por enquanto, sem tasksRepo dedicado
-  //    no AssistantTurnService. Pode ser injetado na Fase 5.2.
-  const activeTasks: ActiveTask[] = [];
+  // 3. Active tasks — pega dos inboxes do thread via JOIN task_mutations
+  const activeTasks: ActiveTask[] = await listActiveTasks(
+    params.tasksRepo,
+    params.inboxId,
+    params.threadId,
+    params.threadContextService,
+  );
 
   return {
     currentMessage: params.currentMessage,
@@ -149,6 +154,45 @@ async function buildThreadContext(params: {
       error: err instanceof Error ? err.message : String(err),
     });
     return { thread_id: params.threadId, recentMessages: [], salientEntities: [] };
+  }
+}
+
+/**
+ * Lista tasks ativas (open/blocked) dos inboxes do thread.
+ * Sem tasksRepo ou threadContextService → retorna [] (Reasoner ainda funciona,
+ * só não tem visibilidade de tasks para decidir update_existing).
+ */
+async function listActiveTasks(
+  tasksRepo: TasksRepository | null,
+  inboxId: string,
+  threadId: string,
+  threadContextService: ThreadConversationContextService | null,
+): Promise<ActiveTask[]> {
+  if (!tasksRepo || !threadContextService) return [];
+
+  try {
+    const ctx = await threadContextService.buildForThread(threadId);
+    const inboxIds = new Set<string>([inboxId]);
+    if (ctx) {
+      for (const m of ctx.recentMessages) inboxIds.add(m.inboxItemId);
+    }
+    const list = await tasksRepo.listActiveByInboxItemIds(Array.from(inboxIds), 20);
+    return list.map((t) => ({
+      id: t.id,
+      title: t.title,
+      status: t.status,
+      due_at: t.due_at ?? null,
+      assignee_reference: null, // resolver via entity_id depois, se preciso
+      project_reference: null,
+      inbox_item_id: t.inbox_item_id,
+      created_at: t.created_at,
+    }));
+  } catch (err) {
+    log('warn', 'reasoner_context', {
+      step: 'list_active_tasks_failed',
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return [];
   }
 }
 
